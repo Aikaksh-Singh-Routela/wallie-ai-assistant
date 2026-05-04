@@ -1,0 +1,74 @@
+"""Fan-in for all enabled chat platforms into a single asyncio queue.
+
+Per-platform monitors are imported lazily so a missing SDK only breaks the
+specific platform that depends on it.
+"""
+from __future__ import annotations
+
+import asyncio
+from typing import Optional
+
+from loguru import logger
+
+from config import ChatConfig, Secrets
+
+from .base import ChatMessage, ChatMonitor
+
+
+class ChatManager:
+    def __init__(self, cfg: ChatConfig, secrets: Secrets) -> None:
+        self._cfg = cfg
+        self._secrets = secrets
+        self.queue: asyncio.Queue[ChatMessage] = asyncio.Queue(maxsize=200)
+        self._monitors: list[ChatMonitor] = []
+
+    async def start(self) -> None:
+        if self._cfg.youtube_enabled:
+            try:
+                from .youtube import YouTubeChatMonitor
+                self._monitors.append(
+                    YouTubeChatMonitor(
+                        client_secret_file=self._secrets.youtube_client_secret_file,
+                        live_chat_id=self._secrets.youtube_live_chat_id,
+                        api_key=self._secrets.youtube_api_key,
+                    )
+                )
+            except ModuleNotFoundError as e:
+                logger.warning(
+                    f"youtube chat enabled but google-api-python-client is missing: {e}; "
+                    "skipping. Install: pip install google-api-python-client google-auth-oauthlib"
+                )
+
+        if self._cfg.twitch_enabled:
+            try:
+                from .twitch import TwitchChatMonitor
+                self._monitors.append(
+                    TwitchChatMonitor(
+                        channel=self._secrets.twitch_channel,
+                        oauth_token=self._secrets.twitch_oauth_token,
+                        nick=self._secrets.twitch_nick,
+                    )
+                )
+            except ModuleNotFoundError as e:
+                logger.warning(f"twitch chat enabled but websockets is missing: {e}")
+
+        if self._cfg.kick_enabled:
+            try:
+                from .kick import KickChatMonitor
+                self._monitors.append(KickChatMonitor(channel=self._secrets.kick_channel))
+            except ModuleNotFoundError as e:
+                logger.warning(f"kick chat enabled but a dep is missing: {e}")
+
+        for m in self._monitors:
+            await m.start(self.queue)
+
+    async def stop(self) -> None:
+        for m in self._monitors:
+            await m.stop()
+        self._monitors.clear()
+
+    def next_nowait(self) -> Optional[ChatMessage]:
+        try:
+            return self.queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None

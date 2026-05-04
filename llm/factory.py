@@ -1,0 +1,89 @@
+"""Provider factory: map LLMConfig + Secrets to a concrete LLMProvider.
+
+Imports for each provider module are deferred until that provider is actually
+selected. This means a user who only configures Groq doesn't need the Anthropic
+or Google SDKs installed — and a missing SDK produces a clear error instead of
+breaking startup.
+"""
+from __future__ import annotations
+
+from config import LLMConfig, Secrets
+
+from .base import LLMError, LLMProvider
+
+
+def _missing_sdk(name: str, pkg: str) -> LLMError:
+    return LLMError(
+        f"{name} provider selected but '{pkg}' is not installed. "
+        f"Install it with: pip install {pkg}"
+    )
+
+
+def build_provider(cfg: LLMConfig, secrets: Secrets) -> LLMProvider:
+    p = cfg.provider
+
+    if p in ("openai", "groq", "openrouter"):
+        try:
+            from .openai_compat import OpenAICompatProvider
+        except ModuleNotFoundError as e:
+            raise _missing_sdk(p, "openai") from e
+
+        if p == "openai":
+            return OpenAICompatProvider(
+                name="openai",
+                model=cfg.model,
+                api_key=secrets.openai_api_key,
+                supports_vision=cfg.vision_capable,
+            )
+        if p == "groq":
+            return OpenAICompatProvider(
+                name="groq",
+                model=cfg.model,
+                api_key=secrets.groq_api_key,
+                base_url="https://api.groq.com/openai/v1",
+                supports_vision=cfg.vision_capable,
+            )
+        return OpenAICompatProvider(
+            name="openrouter",
+            model=cfg.model,
+            api_key=secrets.openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+            supports_vision=cfg.vision_capable,
+            extra_headers={
+                "HTTP-Referer": "https://github.com/wallie-ai/wallie",
+                "X-Title": "Wallie",
+            },
+        )
+
+    if p == "anthropic":
+        try:
+            from .anthropic import AnthropicProvider
+        except ModuleNotFoundError as e:
+            raise _missing_sdk("anthropic", "anthropic") from e
+        return AnthropicProvider(
+            model=cfg.model,
+            api_key=secrets.anthropic_api_key,
+            supports_vision=cfg.vision_capable,
+        )
+
+    if p == "gemini":
+        try:
+            from .gemini import GeminiProvider
+        except ModuleNotFoundError as e:
+            raise _missing_sdk("gemini", "google-generativeai") from e
+        return GeminiProvider(
+            model=cfg.model,
+            api_key=secrets.gemini_api_key,
+            supports_vision=cfg.vision_capable,
+        )
+
+    if p == "ollama":
+        from .ollama import OllamaProvider
+        return OllamaProvider(
+            model=cfg.model,
+            base_url=cfg.ollama_base_url,
+            keep_alive=cfg.ollama_keep_alive,
+            supports_vision=cfg.vision_capable,
+        )
+
+    raise LLMError(f"Unknown LLM provider: {p}")

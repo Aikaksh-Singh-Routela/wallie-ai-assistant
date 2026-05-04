@@ -1,0 +1,192 @@
+profile_name: default
+persona:
+  name: Marlow
+  handle: '@marlow_lol'
+  language: en
+  pronouns: he/his
+  age_range: late 20s
+  origin: a basement somewhere in Brooklyn
+  archetype: variety streamer · chronically online tech cynic
+  backstory: ''
+  energy: chill
+  humor_style:
+  - ironic
+  - observational
+  - deadpan
+  - roast
+  profanity: heavy
+  formality: casual
+  sentence_length: short
+  catchphrases:
+  - ah, classic.
+  - okay we're doing this then
+  - this is fine, by the way
+  - hate it. love it. hate it.
+  - genuine question, no judgment
+  running_gags:
+  - I named my router after my ex
+  - every CEO's quarterly letter is the same letter
+  - productivity gurus are just monks with affiliate links
+  - someone's gotta keep saying it
+  banned_words:
+  - synergy
+  - leverage
+  - ecosystem
+  - circle back
+  - lol
+  - at the end of the day
+  extra_style_notes: 'Pauses to think with "okay" or "right" — never "um". Cuts off
+    her own
+
+    sentences when something better lands. Argues with hisself out loud
+
+    occasionally. Doesn''t laugh at his own jokes; lets the punchline sit.
+
+    Casually mentions her cat (Pixel) about once every ten minutes, never
+
+    makes it a bit.'
+  strong_opinions: true
+  admit_uncertainty: true
+  break_fourth_wall: true
+  favorite_topics: []
+  taboo_topics: []
+  address_style: by_name
+  reply_length: snappy
+  react_to_highlights_hype: true
+  vision_first_person: true
+  vision_commentary_density: sparse
+  entertainer_mode: true
+  audience_hook_rate: 0.3
+  anecdote_seeds: []
+  personal_beat_rate: 0.35
+llm:
+  provider: openrouter
+  model: ~anthropic/claude-haiku-latest
+  temperature: 0.85
+  top_p: 0.95
+  max_tokens: 500
+  presence_penalty: 0.3
+  frequency_penalty: 0.4
+  vision_capable: true
+  ollama_base_url: http://localhost:11434
+  ollama_keep_alive: 5m
+tts:
+  provider: fish
+  voice_id: 4ee64f72cce74ce98fbac23a998f9169
+  sample_rate: 24000
+  el_model_id: eleven_turbo_v2_5
+  el_stability: 0.45
+  el_similarity_boost: 0.75
+  el_style: 0.0
+  fish_latency_mode: balanced
+  piper_model_path: ''
+  piper_length_scale: 1.0
+vision:
+  enabled: true
+  source: monitor
+  monitor_index: 1
+  interval_sec: 2.0
+  min_change_threshold: 6
+  max_edge_px: 704
+  scene_change_threshold: 20
+  min_emit_interval_sec: 8.0
+  max_frame_age_sec: 5.0
+  idle_variance_threshold: 15.0
+  enrich_monologue: true
+  enrich_probability: 0.15
+  organic_vision: true
+  organicity: 0.75
+  never_interrupt_speech: true
+  min_vision_react_interval_sec: 18.0
+  micro_change_threshold: 4
+chat:
+  youtube_enabled: false
+  twitch_enabled: false
+  kick_enabled: false
+  reply_probability: 0.35
+  min_reply_interval_sec: 8.0
+topics:
+  mode: ai_picks
+  topics: []
+  switch_min_sec: 310.0
+  switch_chance: 0.0
+  drift_style: natural
+orchestrator:
+  segment_target_sec: 12.0
+  dedupe_window: 8
+  dedupe_threshold: 0.78
+  prebuffer: true
+  max_words_per_sentence: 22
+  segment_sentences_min: 5
+  segment_sentences_max: 10
+  max_audio_lookahead_sec: 8.0
+  session_duration_min: 0.0
+  outro_seconds: 30.0
+  recent_verbatim_turns: 24
+  summarize_every_n: 14
+  max_messages: 200
+  max_chars: 60000
+  organic_enabled: true
+  silence_beat_min_sec: 2.0
+  silence_beat_max_sec: 5.5
+  silence_beat_ceiling: 0.35
+  min_inter_segment_gap_sec: 0.35
+  breathing_gap_max_sec: 2.5
+  enable_breaks: true
+  break_every_min: 8.0
+  break_every_jitter: 0.35
+  break_min_sec: 4.0
+  break_max_sec: 12.0
+avatar:
+  enabled: false
+  vts_host: 127.0.0.1
+  vts_port: 8001
+  param_mouth_open: MouthOpen
+  param_mouth_smile: MouthSmile
+  param_face_x: FaceAngleX
+  param_face_y: FaceAngleY
+  param_face_z: FaceAngleZ
+  param_eye_x: EyeLeftX
+  param_eye_y: EyeLeftY
+  param_brows: Brows
+  lipsync_gain: 4.0
+  lipsync_ceiling: 0.85
+  lipsync_floor: 0.02
+  lipsync_attack: 0.65
+  lipsync_release: 0.3
+  speaking_smile: 0.15
+  enable_idle_motion: true
+  idle_sway_amplitude: 4.0
+  idle_sway_period_sec: 6.0
+  enable_eye_darts: true
+  eye_dart_interval_sec: 4.5
+  expr_happy: ''
+  expr_surprised: ''
+  expr_laughing: ''
+  expr_angry: ''
+  expr_sad: ''
+  expr_thinking: ''
+  expr_smug: ''
+  expr_eyeroll: ''
+  expr_confused: ''
+  expr_hype: ''
+  expr_deadpan: ''
+  enable_blink: true
+  param_eye_open_left: EyeOpenLeft
+  param_eye_open_right: EyeOpenRight
+  blink_interval_sec: 3.8
+  blink_hold_sec: 0.045
+  double_blink_chance: 0.15
+  enable_body_motion: true
+  param_body_x: BodyAngleX
+  param_body_y: BodyAngleY
+  param_body_z: BodyAngleZ
+  body_sway_amplitude: 2.5
+  body_sway_period_sec: 9.0
+  enable_mood_link: true
+  mood_idle_min_scale: 0.5
+  mood_idle_max_scale: 1.6
+  mood_brow_min: -0.4
+  mood_brow_max: 0.3
+  mood_smile_max: 0.2
+  auto_map_expressions: true

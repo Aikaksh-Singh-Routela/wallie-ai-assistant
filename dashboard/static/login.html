@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wallie</title>
+  <style>
+    :root {
+      --bg-0: #08090d;
+      --bg-1: #0e1117;
+      --bg-2: #141821;
+      --bg-3: #1a1f2a;
+      --line: #222836;
+      --fg-0: #f2f4f7;
+      --fg-1: #c6cbd4;
+      --fg-2: #8a93a3;
+      --accent: #f43f5e;
+      --accent-hot: #ff6b8a;
+      --err: #ef4444;
+      --radius: 8px;
+      --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-0);
+      color: var(--fg-0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: var(--bg-1);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 48px 40px 40px;
+      width: 360px;
+      text-align: center;
+    }
+    .logo {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .logo span { color: var(--accent); }
+    .subtitle {
+      color: var(--fg-2);
+      font-size: 13px;
+      margin-bottom: 32px;
+    }
+    .pin-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .pin-digit {
+      width: 52px;
+      height: 60px;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--fg-0);
+      font-family: var(--mono);
+      font-size: 24px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .pin-digit:focus {
+      border-color: var(--accent);
+    }
+    .pin-digit.error {
+      border-color: var(--err);
+      animation: shake 0.3s ease;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: var(--accent-hot); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-msg {
+      color: var(--err);
+      font-size: 12px;
+      margin-top: 16px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .error-msg.visible { opacity: 1; }
+    .hint {
+      color: var(--fg-2);
+      font-size: 11px;
+      margin-top: 24px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><span>W</span>allie</div>
+    <div class="subtitle">Enter your PIN to access the dashboard</div>
+
+    <form id="form" autocomplete="off">
+      <div class="pin-row">
+        <input class="pin-digit" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" autofocus />
+        <input class="pin-digit" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+        <input class="pin-digit" type="tel" maxlength="1" inputmode="numeric" pattern="[0-9]" />
+      </div>
+      <button type="submit">Enter</button>
+    </form>
+
+    <div class="error-msg" id="error">Wrong PIN. Check the terminal on your streaming PC.</div>
+    <div class="hint">
+      The PIN is shown in the terminal where Wallie is running.<br />
+      Set <code>DASHBOARD_PIN</code> in .env for a permanent PIN.
+    </div>
+  </div>
+
+  <script>
+    const digits = document.querySelectorAll('.pin-digit');
+    const form = document.getElementById('form');
+    const errorEl = document.getElementById('error');
+
+    // Auto-advance on input, auto-backspace on delete
+    digits.forEach((input, i) => {
+      input.addEventListener('input', () => {
+        input.value = input.value.replace(/[^0-9]/g, '');
+        if (input.value && i < digits.length - 1) {
+          digits[i + 1].focus();
+        }
+        // Auto-submit when all 4 filled
+        if (i === digits.length - 1 && input.value) {
+          form.dispatchEvent(new Event('submit'));
+        }
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && i > 0) {
+          digits[i - 1].focus();
+        }
+      });
+      // Select on focus for easy re-entry
+      input.addEventListener('focus', () => input.select());
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pin = Array.from(digits).map(d => d.value).join('');
+      if (pin.length < 4) return;
+
+      errorEl.classList.remove('visible');
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+        });
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          errorEl.classList.add('visible');
+          digits.forEach(d => { d.value = ''; d.classList.add('error'); });
+          digits[0].focus();
+          setTimeout(() => digits.forEach(d => d.classList.remove('error')), 300);
+        }
+      } catch {
+        errorEl.textContent = 'Connection failed';
+        errorEl.classList.add('visible');
+      }
+    });
+  </script>
+</body>
+</html>
