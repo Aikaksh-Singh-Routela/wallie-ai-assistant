@@ -60,8 +60,8 @@ persona:
   anecdote_seeds: []
   personal_beat_rate: 0.35
 llm:
-  provider: openrouter
-  model: ~anthropic/claude-haiku-latest
+  provider: groq
+  model: meta-llama/llama-4-scout-17b-16e-instruct
   temperature: 0.85
   top_p: 0.95
   max_tokens: 500
@@ -92,8 +92,8 @@ vision:
   min_emit_interval_sec: 8.0
   max_frame_age_sec: 5.0
   idle_variance_threshold: 15.0
-  enrich_monologue: true
-  enrich_probability: 0.15
+  enrich_monologue: false
+  enrich_probability: 0.0
   organic_vision: true
   organicity: 0.75
   never_interrupt_speech: true
@@ -117,8 +117,8 @@ orchestrator:
   dedupe_threshold: 0.78
   prebuffer: true
   max_words_per_sentence: 22
-  segment_sentences_min: 5
-  segment_sentences_max: 10
+  segment_sentences_min: 3
+  segment_sentences_max: 5
   max_audio_lookahead_sec: 8.0
   session_duration_min: 0.0
   outro_seconds: 30.0

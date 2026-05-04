@@ -619,11 +619,15 @@ class Persona:
         if adaptation_hint:
             activity_line = f"\n\nACTIVITY CONTEXT: {adaptation_hint}"
 
+        # VOICE_ANCHOR: keeps the tone in character but DOES NOT encourage long
+        # takes or opinion pieces. "The screen is a trigger; the take is what
+        # actually matters" was the direct cause of essay-length vision reactions
+        # — it told the model to pivot away from the screen and write analysis.
         VOICE_ANCHOR = (
-            f"\n\nVoice anchor: react as {p.name} — {p.energy} energy, "
-            f"humor that's {humor_words}.{mood_hint} You are entertaining the "
-            "audience, not narrating a tour. The screen is a trigger; the take "
-            "is what actually matters."
+            f"\n\nVoice: {p.name}, {p.energy} energy, {humor_words} humor.{mood_hint} "
+            "SHORT and DIRECT — 1-2 sentences MAX. "
+            "React to what is ON SCREEN right now. No topic pivots. No essays. "
+            "A real streamer glances up and says one thing, then moves on."
             f"{activity_line}"
         )
 
@@ -639,9 +643,8 @@ class Persona:
             }
             tone = tone_map.get(glance_style, tone_map["neutral"])
             base = (
-                f"REACT TO YOUR SCREEN. Fresh frame attached. "
-                f"ONE short line about what you see {tone}. "
-                "Only about the screen. Forget your topic. "
+                f"SCREEN REACTION. ONE sentence {tone} — exactly one, no more. "
+                "Name what you see. Say your instant reaction. Done. "
                 "If nothing stands out: SKIP"
             )
             return base + VOICE_ANCHOR
@@ -653,16 +656,14 @@ class Persona:
             seed_line = ""
             if tangent_seed:
                 seed_line = (
-                    f"\nSpringboard: your bit about \"{tangent_seed}\" "
-                    "if it fits what's on screen."
+                    f"\nIf it fits what's on screen, drop your bit about \"{tangent_seed}\"."
                 )
             cap = max(2, target_sentences) if target_sentences else 2
             base = (
-                "REACT TO YOUR SCREEN. Fresh frame attached. "
-                "Name ONE thing you see, then riff off it — a story, a take, a memory "
-                f"it triggered. {cap} sentences max. "
-                "Start from the screen, go wherever it takes you. "
-                "Forget your current topic — the screen is the trigger now."
+                f"SCREEN REACTION → SHORT TANGENT. {cap} sentences TOTAL — hard cap. "
+                "Sentence 1: name the specific thing you see on screen. "
+                "Sentence 2: your quick take or a thought it sparked. That's it. "
+                "No monologue. No topic continuation. Short and punchy."
                 f"{seed_line}"
             )
             return base + VOICE_ANCHOR
@@ -694,12 +695,12 @@ class Persona:
             if last_description:
                 tail = _tail_text(last_description, max_chars=160)
                 context = (
-                    f'(You already said: "{tail}". Only react to what CHANGED.)'
+                    f'(Previously: "{tail}". React ONLY to what changed.)'
                 )
             base = (
-                "REACT TO YOUR SCREEN. Something changed. Fresh frame attached. "
-                "One sentence about the specific change you notice. "
-                "Only the screen. Forget your topic. "
+                "SCREEN REACTION. Something changed. "
+                "ONE sentence — exactly. What specifically changed? Name it. "
+                "Short. Direct. Forget your topic. "
                 f"{context} "
                 "If nothing meaningful changed: SKIP"
             ).strip()
@@ -711,7 +712,7 @@ class Persona:
         bridge = ""
         if last_description:
             tail = _tail_text(last_description, max_chars=160)
-            bridge = f'(Previously you said: "{tail}". This is different — react fresh.)'
+            bridge = f'(Previously: "{tail}" — this is new, react fresh.)'
 
         cap = max(1, target_sentences) if target_sentences else 1
         is_active_content = screen_activity in ("media", "app_switch")
@@ -719,12 +720,15 @@ class Persona:
             cap = max(cap, 2)
 
         base = (
-            f"REACT TO YOUR SCREEN. Fresh frame attached. {cap} sentence{'s' if cap > 1 else ''}. "
-            "Talk ONLY about what you see on the screen right now. "
-            "Forget your current topic — this is a screen reaction moment. "
-            "Name specific things: characters, games, headlines, brands, text. "
-            "No generic UI narration. No 'I can see'. "
-            f"If nothing stands out: SKIP. {bridge}"
+            f"SCREEN REACTION ONLY. Fresh frame attached. "
+            f"Exactly {cap} sentence{'s' if cap > 1 else ''} — HARD CAP, do not go over. "
+            "Look at the frame. What is it? Name the specific site, game, app, content, or text. "
+            "Say your instant reaction to it. That's everything. "
+            "DO NOT continue your previous topic. "
+            "DO NOT write an opinion piece or analysis. "
+            "DO NOT ramble. Short. Direct. Like you glanced up mid-stream and said one thing. "
+            "Forbidden: generic phrases like 'a page', 'some content', 'a screen', 'I can see'. "
+            f"If nothing specific stands out: SKIP. {bridge}"
         ).strip()
         return base + SPECIFICITY_RULES + VOICE_ANCHOR
 

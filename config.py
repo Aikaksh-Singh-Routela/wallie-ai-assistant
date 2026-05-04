@@ -144,7 +144,6 @@ class LLMConfig(BaseModel):
     temperature: float = 0.85
     top_p: float = 0.95
     max_tokens: int = 150
-    max_tokens: int = 150
     presence_penalty: float = 0.3
     frequency_penalty: float = 0.4
     vision_capable: bool = False
@@ -188,11 +187,16 @@ class VisionConfig(BaseModel):
     max_frame_age_sec: float = 5.0
     # Image std below this → IDLE (blank screen / desktop / static)
     idle_variance_threshold: float = 15.0
-    # Attach a live screen frame to monologue turns to enrich commentary
-    enrich_monologue: bool = True
-    # Probability [0..1] that any given monologue turn gets a screen snapshot
+    # Attach a live screen frame to monologue turns to enrich commentary.
+    # DISABLED by default: vision-capable models cannot ignore an attached
+    # image regardless of prompt instructions, causing them to narrate screen
+    # content for minutes. Enable only with non-vision LLMs (e.g. text-only
+    # Ollama models) where the frame is sent as a text OCR hint instead.
+    enrich_monologue: bool = False
+    # Probability [0..1] that any given monologue turn gets a screen snapshot.
+    # Kept low intentionally — even with enrich_monologue=True this should
+    # fire rarely so the model doesn't drift into a screen-narration loop.
     enrich_probability: float = 0.08
-    enrich_probability: float = 0.25
 
     # --- Organic layer -----------------------------------------------------
     # Master switch for the AttentionEngine + MoodEngine path. When off, every
@@ -208,7 +212,6 @@ class VisionConfig(BaseModel):
     # Minimum seconds between two vision-anchored segments. Prevents the
     # streamer from machine-gunning reactions on every screen change.
     # Real streamers glance and move on — they don't narrate every click.
-    min_vision_react_interval_sec: float = 30.0
     min_vision_react_interval_sec: float = 18.0
     # Minimum Hamming distance for a DELTA to be *even considered* — filters
     # micro-changes (cursor movement, animated ads, small UI ticks).
@@ -254,8 +257,6 @@ class OrchestratorConfig(BaseModel):
     # How many sentences the LLM should aim for per monologue segment.
     # Longer segments reduce inter-segment gaps and sound more natural.
     # Short (3-5) is choppy, medium (5-10) flows well, long (8-14) for deep dives.
-    segment_sentences_min: int = 5
-    segment_sentences_max: int = 10
     segment_sentences_min: int = 3
     segment_sentences_max: int = 6
     # How much audio (seconds) can be queued before we hold off starting the

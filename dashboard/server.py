@@ -592,12 +592,12 @@ def _build_app(
         )
         # Force the screen-anchored prompt.
         oc = cfg.orchestrator
-        user = persona.monologue_turn(
-            screen_attached=True, last_segment=None,
-            sentences_min=oc.segment_sentences_min,
-            sentences_max=oc.segment_sentences_max,
-            topic_drift_style=cfg.topics.drift_style,
-        )
+        user = persona.vision_turn(
+        change_type="scene",
+        mood_label="warm",
+        target_sentences=1,   
+        screen_activity="",
+    )
         msgs = [
             {"role": "system", "content": system},
             {
@@ -612,13 +612,13 @@ def _build_app(
         try:
             tokens: list[str] = []
             async for tok in llm.stream(
-                msgs,
-                temperature=cfg.llm.temperature,
-                top_p=cfg.llm.top_p,
-                max_tokens=min(cfg.llm.max_tokens, 220),
-                presence_penalty=cfg.llm.presence_penalty,
-                frequency_penalty=cfg.llm.frequency_penalty,
-            ):
+            msgs,
+            temperature=cfg.llm.temperature,
+            top_p=cfg.llm.top_p,
+            max_tokens=min(cfg.llm.max_tokens, 70),   # 220 -> 70
+            presence_penalty=cfg.llm.presence_penalty,
+            frequency_penalty=cfg.llm.frequency_penalty,
+        ):
                 tokens.append(tok)
         finally:
             await llm.aclose()

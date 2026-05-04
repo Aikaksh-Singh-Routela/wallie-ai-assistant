@@ -127,9 +127,9 @@ class Orchestrator:
         # "every segment ends in a question" failure mode.
         self._segments_ended_with_question: int = 0
         # Latest screen frame. Updated whenever a vision event arrives. We
-        # consume it for vision-intent segments AND attach it to monologue
-        # turns when vision is enabled, so the streamer is always aware of
-        # the screen — not just on change events.
+        # consume it ONLY for vision-intent segments. Monologue turns never
+        # get the raw frame attached — vision-capable models ignore "IGNORE"
+        # instructions and narrate the screen regardless.
         self._latest_frame: Optional["VisionEvent"] = None
         self._latest_frame_ts: float = 0.0
         # Scene memory: tracks what the AI last described so it can build on it.
@@ -664,8 +664,8 @@ class Orchestrator:
             await asyncio.sleep(0.6)
             return
 
-        # Only vision turns need a guaranteed fresh frame. Monologue turns
-        # get a frame only when the enrich probability check passes.
+        # Only vision-intent turns need a guaranteed fresh frame. Monologue
+        # turns never have a frame attached — see _build_user_turn for why.
         if intent.kind == "vision":
             await self._ensure_fresh_screen_frame()
 
@@ -691,9 +691,9 @@ class Orchestrator:
             # Hard token cap per reaction type — the LLM CANNOT physically
             # produce a 10-sentence rant about a notes app if we cut it off.
             _vision_tok_caps = {
-                VisionReaction.GLANCE: 60,
-                VisionReaction.DEEP: 120,
-                VisionReaction.TANGENT: 160,
+                VisionReaction.GLANCE: 35,
+                VisionReaction.DEEP: 70,
+                VisionReaction.TANGENT: 100,
             }
             max_tok = min(max_tok, _vision_tok_caps.get(
                 intent.vision_directive.reaction, 120))
@@ -715,7 +715,7 @@ class Orchestrator:
         # is hit the producer stops feeding sentences and signals EOF.
         vision_sentence_cap = 0
         if intent.kind == "vision" and intent.vision_directive:
-            vision_sentence_cap = max(1, intent.vision_directive.target_sentences)
+            vision_sentence_cap = min(2, max(1, intent.vision_directive.target_sentences))
         produced_sentence_count = 0
 
         async def producer() -> None:
@@ -993,19 +993,22 @@ class Orchestrator:
             mins = (time.time() - self._session_start_ts) / 60.0 if self._session_start_ts else 0.0
             return (self._persona.outro_turn(minutes_streamed=mins), [], "outro")
 
-        # Monologue. Only attach a screen frame when the enrich probability
-        # check passed this turn. Previously, every cached frame was attached
-        # to every monologue, causing the LLM to talk about the screen for
-        # 10+ minutes even with "ignore screen" prompts.
+        # Monologue. NEVER attach a raw JPEG frame here — vision-capable models
+        # (Claude, GPT-4o, Gemini) will process any attached image regardless of
+        # how strongly the prompt says "IGNORE the screen". The result is the
+        # model drifting into a multi-minute screen-narration loop.
+        #
+        # enrich_monologue works at the text layer only: the orchestrator already
+        # grabbed a fresh frame for the activity/adaptation hint when the
+        # enrich_probability check passed; we reset the flag and let the normal
+        # monologue prompt run without any image payload.
         images: list[ImageBlock] = []
         screen_attached = False
-        if self._enrich_this_turn and self._latest_frame is not None:
-            images.append(
-                ImageBlock(data=self._latest_frame.frame.jpeg, mime="image/jpeg")
-            )
-            screen_attached = True
-            logger.info("vision: enrich frame attached to monologue")
+        if self._enrich_this_turn:
+            # Reset flag — the grab already happened in _choose_intent.
+            # We intentionally do NOT attach the JPEG.
             self._enrich_this_turn = False
+            logger.debug("vision: enrich_monologue — flag reset, image intentionally not attached")
 
         forbidden_phrases = self._phrases_to_forbid()
         # Suppress question-style endings if the last 1-2 segments already
