@@ -1,9 +1,4 @@
-"""YouTube live chat monitor.
-
-Uses the YouTube Data API v3 liveChatMessages.list endpoint with OAuth. The user
-drops a client_secret.json under scripts/ and runs the first auth flow once; the
-refresh token is cached in token.json.
-"""
+"""YouTube live chat monitor via Data API v3."""
 from __future__ import annotations
 
 import asyncio

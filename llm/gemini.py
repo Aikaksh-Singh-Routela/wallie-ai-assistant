@@ -1,8 +1,4 @@
-"""Google Gemini provider via google-generativeai.
-
-Gemini wants a single system instruction on the model object and "parts" per turn.
-We flatten our content blocks into parts.
-"""
+"""Google Gemini provider via google-generativeai."""
 from __future__ import annotations
 
 import asyncio
@@ -34,13 +30,15 @@ class GeminiProvider(LLMProvider):
         frequency_penalty: float = 0.0,
     ) -> AsyncIterator[str]:
         system_prompt, rest = self._split_system(messages)
+        # Gemini needs at least ~40 tokens to avoid safety filter triggers.
+        effective_tokens = max(40, max_tokens)
         model = genai.GenerativeModel(
             self._model_name,
             system_instruction=system_prompt or None,
             generation_config={
                 "temperature": temperature,
                 "top_p": top_p,
-                "max_output_tokens": max_tokens,
+                "max_output_tokens": effective_tokens,
             },
         )
         contents = [self._encode_message(m) for m in rest]
@@ -50,12 +48,14 @@ class GeminiProvider(LLMProvider):
             raise LLMError(f"gemini request failed: {e}") from e
 
         async for chunk in response:
-            text = getattr(chunk, "text", None)
+            try:
+                text = getattr(chunk, "text", None)
+            except ValueError:
+                break
             if text:
                 yield text
 
     async def aclose(self) -> None:
-        # genai's sync client doesn't require explicit close.
         await asyncio.sleep(0)
 
     # ----- helpers -----

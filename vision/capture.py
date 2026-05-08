@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import mss
@@ -11,10 +11,18 @@ from PIL import Image
 
 @dataclass
 class Frame:
-    jpeg: bytes  # Already encoded; cheaper to keep and re-send.
+    jpeg: bytes
     width: int
     height: int
     mime: str = "image/jpeg"
+    _pil_cache: Optional[Image.Image] = field(
+        default=None, repr=False, compare=False, init=False,
+    )
+
+    def to_pil(self) -> Image.Image:
+        if self._pil_cache is None:
+            self._pil_cache = Image.open(io.BytesIO(self.jpeg))
+        return self._pil_cache
 
 
 class ScreenCapture:
@@ -36,8 +44,7 @@ class ScreenCapture:
         raw = sct.grab(mon)
         img = Image.frombytes("RGB", raw.size, raw.rgb)
 
-        # Downscale so the long edge is at most max_edge_px. This is the single
-        # biggest latency and cost win for vision models.
+        # Downscale to max_edge_px.
         w, h = img.size
         scale = min(1.0, self._max_edge / max(w, h))
         if scale < 1.0:

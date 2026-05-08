@@ -1,9 +1,4 @@
-"""Kick.com chat monitor.
-
-Kick's public chat runs on a Pusher-compatible websocket. We resolve the chatroom
-id by hitting their public channel endpoint, then subscribe to the chat channel.
-No auth needed for read-only access.
-"""
+"""Kick.com chat monitor via Pusher websocket."""
 from __future__ import annotations
 
 import asyncio

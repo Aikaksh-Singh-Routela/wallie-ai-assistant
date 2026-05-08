@@ -1,27 +1,4 @@
-"""MoodEngine — a slow, organic energy/mood model for the streamer.
-
-Without this, every segment is generated at the same emotional temperature,
-which is the #1 reason AI streamers feel "robotic". A human host drifts:
-they get energized when chat pops off, they sink a little after a long
-monologue, they'll get reflective 40 minutes in, scatter-brained past the
-90-minute mark, snap to attention if a super chat hits.
-
-MoodEngine exposes:
-  * `arousal` (0..1): how high-energy the host feels right now
-  * `valence` (-1..1): positive/negative mood
-  * `focus` (0..1): how sharp vs. scattered they are
-  * `talkativity` (0..1): how eager they are to say *something* right now
-  * `mood_label`: a short tag like "warm", "wired", "sleepy", "salty"
-
-The orchestrator reads these every turn to bias:
-  * whether to speak at all (low talkativity + boring scene → silence beat)
-  * whether to engage deeply with vision or glance past it
-  * temperature / presence_penalty of the LLM call
-  * duration of inter-segment drain pauses
-
-Nothing in here talks to the LLM directly. It's a cheap state machine that
-can be tested and tuned independently.
-"""
+"""MoodEngine — slow-evolving energy/mood state for the streamer."""
 from __future__ import annotations
 
 import math
@@ -46,20 +23,12 @@ class MoodState:
 
 
 class MoodEngine:
-    """Slow-evolving mood. Call :meth:`tick` every segment (or every loop tick).
-
-    Designed to be conservative: changes are small and smooth so the viewer
-    feels personality drift, not whiplash. Hard kicks (super chat, scene
-    change) come in as explicit events and push sharply.
-    """
-
-    # Baselines around which the host orbits when nothing's happening.
+    # Baselines.
     _BASE_AROUSAL = 0.55
     _BASE_VALENCE = 0.15
     _BASE_FOCUS = 0.75
     _BASE_TALK = 0.70
 
-    # Long-stream drift: how much an hour of talking tires them out.
     _FATIGUE_PER_HOUR = 0.12
     _SCATTER_PER_HOUR = 0.08
 
@@ -68,11 +37,7 @@ class MoodEngine:
         self._state = MoodState()
         self._configure_from_energy(base_energy)
 
-    # ------------------------------------------------------------------
-    # Configuration
-    # ------------------------------------------------------------------
     def _configure_from_energy(self, energy: str) -> None:
-        """Pin the baselines to the persona's configured energy."""
         table = {
             "chill":    (0.40, 0.10, 0.70, 0.55, "chill"),
             "warm":     (0.55, 0.15, 0.75, 0.70, "warm"),
@@ -88,9 +53,6 @@ class MoodEngine:
             arousal=a, valence=v, focus=f, talkativity=t, mood_label=label,
         )
 
-    # ------------------------------------------------------------------
-    # Public state
-    # ------------------------------------------------------------------
     @property
     def state(self) -> MoodState:
         return self._state
@@ -116,7 +78,6 @@ class MoodEngine:
         return self._state.mood_label
 
     def describe(self) -> str:
-        """One-line human description used to colour the system prompt."""
         s = self._state
         if s.arousal >= 0.80:
             a = "buzzing with energy"
@@ -148,11 +109,7 @@ class MoodEngine:
             f = "scatterbrained, jumping around"
         return f"{a}, {v}, {f}"
 
-    # ------------------------------------------------------------------
-    # Events (sharp nudges)
-    # ------------------------------------------------------------------
     def on_highlight_chat(self) -> None:
-        """Super chat / bits / donation — big pop."""
         self._state.arousal = min(1.0, self._state.arousal + 0.25)
         self._state.valence = min(1.0, self._state.valence + 0.25)
         self._state.talkativity = min(1.0, self._state.talkativity + 0.15)
@@ -160,61 +117,46 @@ class MoodEngine:
         self._retag()
 
     def on_ordinary_chat(self) -> None:
-        """Regular chat message — small bump."""
         self._state.arousal = min(1.0, self._state.arousal + 0.05)
         self._state.valence = min(1.0, self._state.valence + 0.03)
         self._state.talkativity = min(1.0, self._state.talkativity + 0.05)
         self._retag()
 
     def on_scene_change(self) -> None:
-        """New scene on screen — mild attention bump."""
         self._state.arousal = min(1.0, self._state.arousal + 0.06)
         self._state.focus = min(1.0, self._state.focus + 0.04)
         self._retag()
 
     def on_boring_stretch(self) -> None:
-        """Nothing interesting happened for a while — drift down slightly."""
         self._state.arousal = max(0.0, self._state.arousal - 0.04)
         self._state.talkativity = max(0.0, self._state.talkativity - 0.03)
         self._retag()
 
     def on_segment_spoken(self, *, length_chars: int = 0) -> None:
-        """Called after every delivered segment."""
-        # Speaking burns a little energy but feeds talkativity for another beat.
         self._state.spoken_in_a_row += 1
         self._state.silent_in_a_row = 0
-        # Long segment → need a breather next.
         if length_chars > 600:
             self._state.arousal = max(0.0, self._state.arousal - 0.06)
             self._state.talkativity = max(0.0, self._state.talkativity - 0.12)
         else:
             self._state.talkativity = max(0.0, self._state.talkativity - 0.04)
-        # Monologue chain depresses talkativity more aggressively.
         if self._state.spoken_in_a_row > 3:
             self._state.talkativity = max(0.0, self._state.talkativity - 0.05)
         self._retag()
 
     def on_silence_beat(self) -> None:
-        """Called when the orchestrator intentionally holds a silent beat."""
         self._state.silent_in_a_row += 1
         self._state.spoken_in_a_row = 0
-        # Rebounding talkativity — the urge to speak grows again.
         self._state.talkativity = min(1.0, self._state.talkativity + 0.12)
         self._retag()
 
-    # ------------------------------------------------------------------
-    # Slow drift (call every loop iteration)
-    # ------------------------------------------------------------------
     def tick(self) -> None:
-        """Apply slow drift toward baselines + session-level fatigue."""
         now = time.time()
         dt = now - self._state.last_update
         self._state.last_update = now
         if dt <= 0:
             return
 
-        # 1) Slow gravitation back toward baseline (stronger when far away).
-        #    time constant ≈ 90s — takes about 1.5 min to decay a deviation.
         tau = 90.0
         decay = 1.0 - math.exp(-dt / tau)
         self._state.arousal += (self._BASE_AROUSAL - self._state.arousal) * decay * 0.6
@@ -222,20 +164,17 @@ class MoodEngine:
         self._state.focus += (self._BASE_FOCUS - self._state.focus) * decay * 0.4
         self._state.talkativity += (self._BASE_TALK - self._state.talkativity) * decay * 0.5
 
-        # 2) Session fatigue: very slow drag on arousal & focus over an hour.
         hours = (now - self._state.session_started_at) / 3600.0
         fatigue = min(0.35, self._FATIGUE_PER_HOUR * hours)
         scatter = min(0.30, self._SCATTER_PER_HOUR * hours)
         self._state.arousal = max(0.10, self._state.arousal - fatigue * decay)
         self._state.focus = max(0.20, self._state.focus - scatter * decay)
 
-        # 3) Tiny random wobble so values aren't perfectly static.
         self._state.arousal += (self._rng.random() - 0.5) * 0.01
         self._state.valence += (self._rng.random() - 0.5) * 0.01
         self._state.focus += (self._rng.random() - 0.5) * 0.01
         self._state.talkativity += (self._rng.random() - 0.5) * 0.01
 
-        # Clamp
         self._state.arousal = _clip01(self._state.arousal)
         self._state.focus = _clip01(self._state.focus)
         self._state.talkativity = _clip01(self._state.talkativity)
@@ -243,25 +182,13 @@ class MoodEngine:
 
         self._retag()
 
-    # ------------------------------------------------------------------
-    # Helpers for orchestrator
-    # ------------------------------------------------------------------
     def llm_temperature_bias(self) -> float:
-        """How much to adjust LLM temperature from the configured base.
-
-        Wired/unhinged → hotter; sleepy/focused → cooler.
-        Output in roughly [-0.15, +0.20].
-        """
         base = 0.0
         base += (self._state.arousal - 0.55) * 0.25
         base += (0.5 - self._state.focus) * 0.15
         return max(-0.20, min(0.25, base))
 
     def silence_probability(self) -> float:
-        """Probability the orchestrator should insert a short silent beat
-        instead of forcing another monologue. Higher when talkativity is
-        low, when many segments were spoken in a row, or when the host is
-        sleepy."""
         p = 0.0
         p += (1.0 - self._state.talkativity) * 0.35
         if self._state.spoken_in_a_row >= 3:
@@ -271,21 +198,12 @@ class MoodEngine:
         return min(0.55, p)
 
     def wants_vision_engagement(self) -> float:
-        """0..1 — how willing they are to actually react to what's on screen
-        right now. Feeds the AttentionEngine decision.
-
-        High when focused & energized; low when tired or in a monologue chain.
-        """
         eng = 0.5 * self._state.arousal + 0.5 * self._state.focus
         if self._state.spoken_in_a_row >= 2:
             eng -= 0.10
         return _clip01(eng)
 
-    # ------------------------------------------------------------------
-    # Internal
-    # ------------------------------------------------------------------
     def _retag(self) -> None:
-        """Pick a short mood label from the current state."""
         a, v, f = self._state.arousal, self._state.valence, self._state.focus
         if a >= 0.80 and v >= 0.10:
             self._state.mood_label = "wired"

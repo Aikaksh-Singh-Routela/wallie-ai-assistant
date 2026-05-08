@@ -2,11 +2,11 @@
 
 Usage:
     python scripts/download_piper_voice.py en_US-amy-medium
-    python scripts/download_piper_voice.py tr_TR-dfki-medium
+    python scripts/download_piper_voice.py de_DE-thorsten-medium
     python scripts/download_piper_voice.py en_US-libritts_r-medium  --dest voices
 
 Voice naming convention: ``<lang_REGION>-<voice>-<quality>``
-  * lang_REGION : "en_US", "tr_TR", "de_DE", ...
+  * lang_REGION : "en_US", "de_DE", "es_ES", ...
   * voice       : speaker / dataset name (e.g. "amy", "ryan", "dfki")
   * quality     : "low" (16 kHz), "medium" (22.05 kHz), "high" (22.05 kHz best)
 
@@ -58,7 +58,7 @@ def _download(url: str, dest: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="download_piper_voice")
-    ap.add_argument("voice", help="e.g. en_US-amy-medium  /  tr_TR-dfki-medium")
+    ap.add_argument("voice", help="e.g. en_US-amy-medium  /  de_DE-thorsten-medium")
     ap.add_argument("--dest", default="voices", help="destination directory (default: voices/)")
     args = ap.parse_args(argv)
 

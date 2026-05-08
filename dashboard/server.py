@@ -1,38 +1,4 @@
-"""FastAPI dashboard.
-
-Endpoints:
-
-  GET  /api/profiles                      list profile names + active
-  POST /api/profiles                      create / clone a profile
-  PUT  /api/profiles/{name}/activate      switch active profile
-  DELETE /api/profiles/{name}             delete a profile
-
-  GET  /api/config                        active profile as JSON
-  PUT  /api/config                        save edits back to the active profile
-
-  POST /api/start                         start the orchestrator
-  POST /api/stop                          stop the orchestrator
-  POST /api/break                         trigger a break (streamer pause)
-  POST /api/resume                        resume from a break early
-  GET  /api/status                        live status snapshot
-  GET  /api/audio-devices                 list sounddevice outputs
-
-  POST /api/test/persona                  one-shot LLM call for a persona preview
-  POST /api/test/voice                    one-shot TTS playback through the player
-
-  POST /api/auth/login                    PIN auth (when DASHBOARD_PIN is set)
-
-  WS   /ws/events                         log / status / transcript stream
-
-The UI lives under dashboard/static/ and is intentionally build-free (Alpine.js).
-
-Remote access:
-  Default host is 0.0.0.0 so the dashboard is accessible from other devices on
-  the local network (phone, tablet, second PC). When bound to a non-loopback
-  address, a 4-digit PIN is auto-generated and shown in the terminal. Set
-  DASHBOARD_PIN in .env for a permanent PIN. This lets the streamer control
-  Wallie from their phone without ever showing the dashboard on the stream screen.
-"""
+"""FastAPI dashboard — config, lifecycle, and test endpoints."""
 from __future__ import annotations
 
 import asyncio
@@ -78,7 +44,6 @@ _PUBLIC_PATHS = frozenset({"/login", "/api/auth/login"})
 
 
 def _get_local_ip() -> str:
-    """Best-effort detection of the machine's LAN IP."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0.5)
@@ -90,7 +55,6 @@ def _get_local_ip() -> str:
         return "unknown"
 
 
-# Smallest known-good model per provider for the connectivity test.
 _DEFAULT_TEST_MODELS = {
     "openai": "gpt-4o-mini",
     "groq": "llama-3.1-8b-instant",
@@ -105,8 +69,6 @@ def _default_model_for(provider: str) -> str:
     return _DEFAULT_TEST_MODELS.get(provider, "")
 
 
-# Defence-in-depth: even if a provider error message echoes the API key (some
-# do!), strip recognizable token shapes before returning the error to the UI.
 import re as _re
 
 _KEY_PATTERNS = [
@@ -215,8 +177,6 @@ def _build_app(
     state.orchestrator = initial
     app = FastAPI(title="Wallie Dashboard")
 
-    # Shared auth state via closure — all handlers and the middleware see the
-    # same sessions set.  No class needed, no dual-instance bug.
     _pin = pin
     _sessions: set[str] = set()
 
@@ -349,7 +309,6 @@ def _build_app(
     # ---------- memory endpoints ----------
     @app.get("/api/memory")
     def api_memory_get() -> dict[str, Any]:
-        """Return the persistent memory for the active profile."""
         from config import PROFILES_DIR
         from core import MemoryStore
         cfg = load_profile()
@@ -364,7 +323,6 @@ def _build_app(
 
     @app.delete("/api/memory")
     def api_memory_clear() -> dict[str, Any]:
-        """Wipe persistent memory for the active profile."""
         from config import PROFILES_DIR
         from core import MemoryStore
         cfg = load_profile()
@@ -389,7 +347,7 @@ def _build_app(
             user = persona.chat_turn(
                 username=body.chat_user or "regular_viewer",
                 platform="twitch",
-                text=body.chat_text or "kanka bugün nasıl",
+                text=body.chat_text or "hey what's up today",
                 is_highlight=False,
             )
         elif body.kind == "vision":
@@ -470,7 +428,6 @@ def _build_app(
     # ---------- secrets (API keys) ----------
     @app.get("/api/secrets")
     def api_secrets_list() -> dict[str, Any]:
-        """Masked previews only. The raw values never leave the server process."""
         from secrets_store import list_secrets
         return {"secrets": list_secrets()}
 
@@ -493,13 +450,10 @@ def _build_app(
 
     @app.post("/api/secrets/test")
     async def api_secrets_test(body: TestProviderBody) -> dict[str, Any]:
-        """Make a tiny live call to verify the provider's key works.
-        Bounded to ~10s; never logs the key value itself."""
         from config import LLMConfig, Secrets, TTSConfig
         prov = body.provider
         try:
             if prov in ("openai", "groq", "openrouter", "anthropic", "gemini", "ollama"):
-                # Tiny LLM ping — under 10 tokens, 5s timeout.
                 from llm import build_provider
                 cfg = LLMConfig(provider=prov, model=_default_model_for(prov), max_tokens=4)
                 client = build_provider(cfg, Secrets())
@@ -549,8 +503,6 @@ def _build_app(
 
     @app.post("/api/audio/reset")
     async def audio_reset() -> dict[str, Any]:
-        """Panic recovery: flush the audio buffer + alignment carry-over.
-        Useful when the playback has fallen into static and won't recover."""
         orch = state.orchestrator
         if orch is None:
             raise HTTPException(400, "Orchestrator not running")
@@ -562,9 +514,6 @@ def _build_app(
 
     @app.post("/api/test/vision")
     async def test_vision() -> dict[str, Any]:
-        """Grab one screen frame, send it to the configured vision LLM, return
-        what the model would say. Lets users debug 'is vision actually working'
-        without starting the whole orchestrator."""
         cfg = load_profile()
         if not cfg.llm.vision_capable:
             raise HTTPException(
@@ -612,14 +561,17 @@ def _build_app(
         try:
             tokens: list[str] = []
             async for tok in llm.stream(
-            msgs,
-            temperature=cfg.llm.temperature,
-            top_p=cfg.llm.top_p,
-            max_tokens=min(cfg.llm.max_tokens, 70),   # 220 -> 70
-            presence_penalty=cfg.llm.presence_penalty,
-            frequency_penalty=cfg.llm.frequency_penalty,
-        ):
+                msgs,
+                temperature=cfg.llm.temperature,
+                top_p=cfg.llm.top_p,
+                max_tokens=min(cfg.llm.max_tokens, 80),
+                presence_penalty=cfg.llm.presence_penalty,
+                frequency_penalty=cfg.llm.frequency_penalty,
+            ):
                 tokens.append(tok)
+        except Exception as e:
+            await llm.aclose()
+            raise HTTPException(500, f"LLM error: {e}")
         finally:
             await llm.aclose()
         text = "".join(tokens).strip()
@@ -637,7 +589,6 @@ def _build_app(
         cfg = load_profile()
         orch = state.orchestrator
         if orch and orch.status().get("running"):
-            # If live, route through the orchestrator's player so the same device is used.
             player = orch._player  # noqa: SLF001
             tts = build_tts(cfg.tts, Secrets())
             try:
@@ -646,7 +597,6 @@ def _build_app(
             finally:
                 await tts.aclose()
             return {"ok": True, "routed": "live-player"}
-        # Otherwise spin up a short-lived player just for the preview.
         from audio import AudioPlayer
         tts = build_tts(cfg.tts, Secrets())
         player = AudioPlayer(sample_rate=tts.sample_rate, channels=tts.channels)
@@ -661,10 +611,8 @@ def _build_app(
             await tts.aclose()
         return {"ok": True, "routed": "preview-player"}
 
-    # ---------- websocket ----------
     @app.websocket("/ws/events")
     async def ws_events(ws: WebSocket) -> None:
-        # Auth check: if PIN is active, verify session cookie.
         if _pin and not _is_authed(ws.cookies):
             await ws.accept()
             await ws.close(code=4001, reason="unauthorized")
@@ -700,7 +648,6 @@ async def serve(orchestrator: Orchestrator) -> None:
     pin = os.getenv("DASHBOARD_PIN", "").strip()
     is_remote = host not in ("127.0.0.1", "localhost", "::1")
 
-    # PIN auth: if bound to a network interface, secure with a PIN.
     if pin:
         logger.info("dashboard: PIN auth active (from DASHBOARD_PIN)")
     elif is_remote:

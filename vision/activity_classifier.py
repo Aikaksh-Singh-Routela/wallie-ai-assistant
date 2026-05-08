@@ -1,97 +1,40 @@
-"""Screen activity classifier — detects *what the user is doing* from frame diffs.
-
-The core insight: pHash tells us *how much* changed, but not *how* it changed.
-A scroll, a tab switch, and a video frame all produce similar Hamming distances
-but require completely different AI responses.
-
-Algorithm (cheap, no OpenCV required):
-  1. Divide each frame into a grid of cells (e.g. 6 rows x 4 cols).
-  2. Hash each cell independently (pHash or average hash).
-  3. Compare cell hashes between consecutive frames to build a "change map".
-  4. Pattern-match the change map to classify the activity:
-     - SCROLL: vertical band of cells changed, edges (chrome) stable
-     - NAVIGATION: content cells changed, chrome partially stable
-     - APP_SWITCH: nearly all cells changed including chrome
-     - MEDIA_PLAYING: continuous moderate changes concentrated in one region
-     - TYPING: 1-2 cells changed in a text-area-shaped region
-     - MICRO: only 1 cell changed very slightly
-
-  5. Phase correlation (numpy FFT) detects translation → confirms scroll
-     direction and speed.
-
-All operations run on already-downscaled JPEG frames (768px max edge),
-so the cost is negligible compared to a single LLM call.
-"""
+"""Screen activity classifier — detects scroll, navigation, app switch, etc. from frame diffs."""
 from __future__ import annotations
 
-import io
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Deque, Optional, Tuple
 
 import numpy as np
-from PIL import Image
-
 from .capture import Frame
 from .scene_classifier import ScreenActivity
 
-# Grid dimensions for region-based comparison.
-GRID_ROWS = 6
-GRID_COLS = 4
-# How many recent activity classifications to keep for pattern detection.
+GRID_ROWS = 8
+GRID_COLS = 6
 HISTORY_LEN = 12
-# Phase correlation peak threshold — above this, we're confident about translation.
 PHASE_CORR_THRESHOLD = 0.15
 
 
 @dataclass
 class ActivityResult:
-    """Output of a single classify() call."""
     activity: ScreenActivity
-    confidence: float           # 0..1 — how certain we are about this classification
-    scroll_direction: str = ""  # "up" | "down" | "left" | "right" | ""
-    scroll_speed: float = 0.0   # estimated pixels of translation (on the downscaled frame)
-    changed_ratio: float = 0.0  # fraction of grid cells that changed
-    chrome_stable: bool = True  # whether the app chrome (top/bottom bars) is stable
-    content_region_focus: float = 0.0  # how concentrated changes are in one area
+    confidence: float = 0.0
+    scroll_direction: str = ""
+    scroll_speed: float = 0.0
+    changed_ratio: float = 0.0
+    chrome_stable: bool = True
+    content_region_focus: float = 0.0
 
 
 def _frame_to_gray(frame: Frame) -> np.ndarray:
-    """Convert a JPEG Frame to a grayscale numpy array."""
-    img = Image.open(io.BytesIO(frame.jpeg)).convert("L")
-    return np.array(img, dtype=np.float32)
+    return np.array(frame.to_pil().convert("L"), dtype=np.float32)
 
 
 def _cell_hashes(gray: np.ndarray, rows: int = GRID_ROWS, cols: int = GRID_COLS) -> np.ndarray:
-    """Compute a cheap average-intensity fingerprint per grid cell.
-
-    Returns a (rows, cols) array of mean pixel values. Comparing these between
-    frames is much faster than per-cell pHash and good enough for activity
-    classification — we don't need perceptual quality, just "did this region
-    change significantly?".
-    """
     h, w = gray.shape
-    cell_h, cell_w = h // rows, w // cols
-    result = np.zeros((rows, cols), dtype=np.float32)
-    for r in range(rows):
-        for c in range(cols):
-            y0, y1 = r * cell_h, (r + 1) * cell_h
-            x0, x1 = c * cell_w, (c + 1) * cell_w
-            result[r, c] = gray[y0:y1, x0:x1].mean()
-    return result
-
-
-def _cell_stds(gray: np.ndarray, rows: int = GRID_ROWS, cols: int = GRID_COLS) -> np.ndarray:
-    """Compute per-cell standard deviation — helps distinguish typing from noise."""
-    h, w = gray.shape
-    cell_h, cell_w = h // rows, w // cols
-    result = np.zeros((rows, cols), dtype=np.float32)
-    for r in range(rows):
-        for c in range(cols):
-            y0, y1 = r * cell_h, (r + 1) * cell_h
-            x0, x1 = c * cell_w, (c + 1) * cell_w
-            result[r, c] = gray[y0:y1, x0:x1].std()
-    return result
+    ch, cw = h // rows, w // cols
+    trimmed = gray[: rows * ch, : cols * cw]
+    return trimmed.reshape(rows, ch, cols, cw).mean(axis=(1, 3))
 
 
 def _phase_correlate(prev_gray: np.ndarray, curr_gray: np.ndarray) -> Tuple[float, float, float]:
@@ -137,11 +80,7 @@ def _phase_correlate(prev_gray: np.ndarray, curr_gray: np.ndarray) -> Tuple[floa
 
 
 class ScreenActivityClassifier:
-    """Classifies user screen activity from consecutive frame comparisons.
-
-    Call :meth:`classify` with each new frame. The classifier maintains state
-    (previous frame data, activity history) to detect patterns over time.
-    """
+    """Classifies user screen activity from consecutive frame comparisons."""
 
     def __init__(
         self,
@@ -157,11 +96,6 @@ class ScreenActivityClassifier:
         self._consecutive_media: int = 0
 
     def classify(self, frame: Frame) -> ActivityResult:
-        """Classify the screen activity for a new frame.
-
-        Must be called for every captured frame (including ones that didn't
-        pass the change detector threshold) to maintain accurate state.
-        """
         gray = _frame_to_gray(frame)
         cells = _cell_hashes(gray)
 
@@ -195,9 +129,13 @@ class ScreenActivityClassifier:
         else:
             focus = 0.0
 
-        # --- Phase correlation for scroll detection ---
-        dy, dx, peak_val = _phase_correlate(self._prev_gray, gray)
-        has_translation = peak_val > PHASE_CORR_THRESHOLD and (abs(dy) > 2 or abs(dx) > 2)
+        # Phase correlation only when cells actually changed.
+        if changed_ratio >= 0.05:
+            dy, dx, peak_val = _phase_correlate(self._prev_gray, gray)
+            has_translation = peak_val > PHASE_CORR_THRESHOLD and (abs(dy) > 2 or abs(dx) > 2)
+        else:
+            dy, dx, peak_val = 0.0, 0.0, 0.0
+            has_translation = False
 
         # --- Classify ---
         result = self._decide(
@@ -225,10 +163,6 @@ class ScreenActivityClassifier:
         return result
 
     def recent_pattern(self) -> str:
-        """Summarize the recent activity pattern for the AI.
-
-        Returns a short label like "browsing", "settled", "watching", "rapid_switching".
-        """
         if len(self._history) < 3:
             return "starting"
 
@@ -257,14 +191,12 @@ class ScreenActivityClassifier:
         return "mixed"
 
     def is_user_settled(self) -> bool:
-        """True if the user has been on the same content for a while."""
         if len(self._history) < 4:
             return False
         recent = list(self._history)[-4:]
         return all(a in (ScreenActivity.STATIC, ScreenActivity.MICRO) for a in recent)
 
     def is_rapid_browsing(self) -> bool:
-        """True if the user is quickly flipping through content."""
         if len(self._history) < 4:
             return False
         recent = list(self._history)[-4:]
@@ -279,9 +211,7 @@ class ScreenActivityClassifier:
         self._history.clear()
         self._consecutive_media = 0
 
-    # ------------------------------------------------------------------
-    # Internal decision logic
-    # ------------------------------------------------------------------
+    # --- internal ---
     def _decide(
         self,
         *,
@@ -294,7 +224,7 @@ class ScreenActivityClassifier:
         changed_mask: np.ndarray,
         cell_diff: np.ndarray,
     ) -> ActivityResult:
-        # 1) Nothing changed.
+        # Nothing changed.
         if changed_ratio < 0.05:
             return ActivityResult(
                 activity=ScreenActivity.STATIC,
@@ -303,10 +233,7 @@ class ScreenActivityClassifier:
                 chrome_stable=chrome_stable,
             )
 
-        # 2) Very small, focused change → MICRO or TYPING.
         if changed_ratio < 0.15 and focus > 0.6:
-            # Typing heuristic: changes concentrated in middle-bottom rows
-            # (where text input areas typically are).
             changed_rows = changed_mask.any(axis=1)
             bottom_half_active = changed_rows[len(changed_rows) // 2:].sum()
             if bottom_half_active >= 1 and changed_ratio < 0.10:
@@ -325,7 +252,7 @@ class ScreenActivityClassifier:
                 content_region_focus=focus,
             )
 
-        # 3) Translation detected + chrome stable → SCROLL.
+        # Translation detected + chrome stable → SCROLL.
         if has_translation and chrome_stable and changed_ratio < 0.85:
             direction = ""
             if abs(dy) > abs(dx):
@@ -342,7 +269,7 @@ class ScreenActivityClassifier:
                 chrome_stable=chrome_stable,
             )
 
-        # 4) Nearly everything changed → APP_SWITCH.
+        # Nearly everything changed → APP_SWITCH.
         if changed_ratio > 0.80 and not chrome_stable:
             return ActivityResult(
                 activity=ScreenActivity.APP_SWITCH,
@@ -351,7 +278,7 @@ class ScreenActivityClassifier:
                 chrome_stable=False,
             )
 
-        # 5) Content changed but chrome stable → NAVIGATION.
+        # Content changed but chrome stable → NAVIGATION.
         if content_changed_ratio > 0.45 and chrome_stable:
             return ActivityResult(
                 activity=ScreenActivity.NAVIGATION,
@@ -361,10 +288,8 @@ class ScreenActivityClassifier:
                 content_region_focus=focus,
             )
 
-        # 6) Moderate widespread changes + not translating → MEDIA_PLAYING.
+        # Moderate widespread changes + not translating → MEDIA_PLAYING.
         if 0.15 <= changed_ratio <= 0.70 and not has_translation:
-            # Media heuristic: changes are spread across a region (not focused
-            # like typing) but not everywhere (not app switch).
             if focus < 0.5 or self._consecutive_media >= 2:
                 return ActivityResult(
                     activity=ScreenActivity.MEDIA_PLAYING,
@@ -374,7 +299,7 @@ class ScreenActivityClassifier:
                     content_region_focus=focus,
                 )
 
-        # 7) Chrome changed + moderate content change → APP_SWITCH (softer).
+        # Chrome changed + moderate content change → APP_SWITCH (softer).
         if not chrome_stable and changed_ratio > 0.40:
             return ActivityResult(
                 activity=ScreenActivity.APP_SWITCH,
@@ -383,8 +308,7 @@ class ScreenActivityClassifier:
                 chrome_stable=False,
             )
 
-        # 8) Moderate content change, chrome stable, no clear translation →
-        #    NAVIGATION (fallback).
+        # Moderate content change, chrome stable → NAVIGATION (fallback).
         if chrome_stable and content_changed_ratio > 0.25:
             return ActivityResult(
                 activity=ScreenActivity.NAVIGATION,
@@ -394,8 +318,7 @@ class ScreenActivityClassifier:
                 content_region_focus=focus,
             )
 
-        # 9) Fallback: some change happened but can't classify clearly.
-        #    Default to SCROLL if there's any translation signal, else MICRO.
+        # Fallback.
         if has_translation:
             direction = "down" if dy > 0 else "up"
             return ActivityResult(

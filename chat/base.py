@@ -1,8 +1,4 @@
-"""Shared chat monitor interface.
-
-Each platform adapter pushes ChatMessage instances onto a shared asyncio.Queue
-owned by the orchestrator.
-"""
+"""Shared chat monitor interface."""
 from __future__ import annotations
 
 import asyncio

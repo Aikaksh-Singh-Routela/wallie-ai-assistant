@@ -1,18 +1,4 @@
-"""Secrets management — UI-editable API keys, written to .env safely.
-
-Security model
---------------
-* Keys live in ``BASE_DIR/.env`` (already git-ignored). We never commit them
-  to ``config.yaml`` (the user-shareable profile file).
-* The dashboard NEVER receives the raw value of a stored key. ``list_secrets``
-  returns a masked preview only ("sk-•••abc") so a screenshot can't leak it.
-* Writes go through ``python-dotenv``'s ``set_key`` for proper escaping, then
-  the file is chmod-restricted to 600 on POSIX so other local users can't read
-  it. (Windows ACLs are left to the OS — the dashboard is bound to 127.0.0.1
-  by default, so the local machine boundary is the security boundary.)
-* Empty values delete the key from .env rather than store an empty string.
-* The set of writable env names is hard-coded; arbitrary writes are rejected.
-"""
+"""Secrets management — UI-editable API keys, written to .env safely."""
 from __future__ import annotations
 
 import os
@@ -24,8 +10,6 @@ from config import BASE_DIR
 ENV_FILE = BASE_DIR / ".env"
 
 
-# Field metadata: env name → (display label, kind, help text/url).
-# kind drives grouping in the dashboard. "test"-able kinds: "llm", "tts".
 SECRET_FIELDS: dict[str, dict[str, str]] = {
     "OPENAI_API_KEY": {
         "label": "OpenAI", "kind": "llm",
@@ -96,7 +80,6 @@ SECRET_FIELDS: dict[str, dict[str, str]] = {
 
 
 def mask(value: str) -> str:
-    """Render a 'safe' preview of a secret. Never returns the full value."""
     if not value:
         return ""
     v = value.strip()
@@ -106,7 +89,6 @@ def mask(value: str) -> str:
 
 
 def list_secrets() -> list[dict[str, object]]:
-    """Return metadata + masked previews. Never includes raw values."""
     out: list[dict[str, object]] = []
     for env_name, meta in SECRET_FIELDS.items():
         raw = os.getenv(env_name, "") or ""
@@ -125,11 +107,6 @@ def list_secrets() -> list[dict[str, object]]:
 
 
 def set_secret(env_name: str, value: str) -> None:
-    """Write a secret to .env and reload. Empty value removes the entry.
-
-    Raises ``ValueError`` if env_name is not in the allowed set — prevents the
-    UI from being tricked into writing arbitrary process environment.
-    """
     if env_name not in SECRET_FIELDS:
         raise ValueError(f"refused write to unknown env name: {env_name!r}")
 
@@ -139,7 +116,6 @@ def set_secret(env_name: str, value: str) -> None:
     from dotenv import load_dotenv, set_key, unset_key
 
     if value:
-        # quote_mode='auto' lets dotenv decide based on whitespace / specials.
         set_key(str(ENV_FILE), env_name, value, quote_mode="auto")
     else:
         try:
@@ -149,12 +125,10 @@ def set_secret(env_name: str, value: str) -> None:
             pass
 
     _harden_perms(ENV_FILE)
-    # Make the new value visible to subsequent Secrets() reads in this process.
     load_dotenv(str(ENV_FILE), override=True)
 
 
 def update_many(values: dict[str, str]) -> list[str]:
-    """Update several secrets in one call. Returns the list of envs accepted."""
     accepted: list[str] = []
     for env, val in values.items():
         if env not in SECRET_FIELDS:
@@ -178,7 +152,6 @@ def _ensure_env_file() -> None:
 
 
 def _harden_perms(path: Path) -> None:
-    """Best-effort: restrict .env to the owner on POSIX. Windows is OS-managed."""
     try:
         if os.name != "nt":
             os.chmod(path, 0o600)

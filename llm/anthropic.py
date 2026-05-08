@@ -1,8 +1,4 @@
-"""Anthropic Claude provider.
-
-Claude separates the system prompt from the user/assistant messages and uses a
-different image block shape. We extract the system message and remap images.
-"""
+"""Anthropic Claude provider."""
 from __future__ import annotations
 
 import base64

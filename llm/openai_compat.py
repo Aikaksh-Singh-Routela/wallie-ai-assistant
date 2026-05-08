@@ -1,8 +1,4 @@
-"""OpenAI-compatible provider. Covers OpenAI, Groq, and OpenRouter.
-
-These three speak the same wire format, so one adapter handles all three via a
-different base_url and key. Vision payloads are encoded as base64 data URLs.
-"""
+"""OpenAI-compatible provider — covers OpenAI, Groq, and OpenRouter."""
 from __future__ import annotations
 
 import base64
@@ -75,7 +71,6 @@ class OpenAICompatProvider(LLMProvider):
 
     # ----- helpers -----
     def _encode_message(self, m: dict[str, Any]) -> dict[str, Any]:
-        """Normalize our internal message shape into the OpenAI wire format."""
         content = m.get("content")
         if isinstance(content, list):
             blocks: list[dict[str, Any]] = []

@@ -1,8 +1,4 @@
-"""ElevenLabs TTS adapter (streaming PCM).
-
-Uses the HTTP streaming endpoint with output_format=pcm_* so the bytes can be fed
-directly to the audio player without decoding.
-"""
+"""ElevenLabs TTS adapter (streaming PCM)."""
 from __future__ import annotations
 
 from typing import AsyncIterator

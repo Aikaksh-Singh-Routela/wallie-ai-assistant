@@ -1,14 +1,4 @@
-"""Periodic vision loop.
-
-Grabs a screen frame at a fixed interval, runs change detection, and emits a
-VisionEvent to the orchestrator queue when something meaningful changed.
-
-v2 changes:
-  * VisionEvent gains captured_at (wall-clock timestamp) and change_type (ChangeType).
-  * Respects min_emit_interval_sec: even if a change is detected, no more frequent
-    than this interval.
-  * Queue-full replacement: evict the old stale event, insert the fresh one.
-"""
+"""Periodic vision loop — grabs frames, runs change detection, emits VisionEvents."""
 from __future__ import annotations
 
 import asyncio
@@ -32,10 +22,8 @@ class VisionEvent:
     changed: bool
     captured_at: float = field(default_factory=time.time)
     change_type: ChangeType = ChangeType.SCENE_CHANGE
-    # What the user is doing with the screen (scroll, navigate, etc.).
     activity: ScreenActivity = ScreenActivity.STATIC
     activity_detail: Optional[ActivityResult] = None
-    # Summarized user behavior pattern ("browsing", "settled", "watching", etc.).
     user_pattern: str = ""
 
 
@@ -80,11 +68,6 @@ class VisionLoop:
         self._capture.close()
 
     async def grab_now(self) -> Optional[VisionEvent]:
-        """One-shot capture for on-demand use.
-
-        Bypasses the change detector and the emit-interval throttle.
-        Caller decides whether they need a fresh frame regardless of similarity.
-        """
         loop = asyncio.get_event_loop()
         try:
             frame = await loop.run_in_executor(None, self._capture.grab)
@@ -98,9 +81,7 @@ class VisionLoop:
             logger.warning("vision: on-demand grab failed: {}".format(e))
             return None
 
-    # ------------------------------------------------------------------
-    # Internal loop
-    # ------------------------------------------------------------------
+    # --- internal ---
 
     async def _run(self) -> None:
         loop = asyncio.get_event_loop()
@@ -112,7 +93,6 @@ class VisionLoop:
                     None, self._detector.classify, frame
                 )
 
-                # Extract activity classification from the detector (runs every frame).
                 activity_result = self._detector.last_activity
                 user_pattern = self._detector.activity_pattern
 
@@ -148,18 +128,24 @@ class VisionLoop:
                 elif change_type == ChangeType.IDLE:
                     logger.debug("vision: idle frame skipped")
 
-                await asyncio.sleep(self._cfg.interval_sec)
+                await asyncio.sleep(self._adaptive_interval(change_type))
         except asyncio.CancelledError:
             raise
         except Exception as e:
             logger.error("vision: loop crashed: {}".format(e))
 
-    def _enqueue(self, event: VisionEvent) -> None:
-        """Put event into the queue.
+    def _adaptive_interval(self, change_type: ChangeType) -> float:
+        base = self._cfg.interval_sec
+        if change_type == ChangeType.SCENE_CHANGE:
+            return base * 0.4
+        if change_type == ChangeType.DELTA:
+            return base * 0.7
+        if change_type == ChangeType.IDLE:
+            return base * 2.0
+        # NONE — nothing happening, sample slower.
+        return base * 1.3
 
-        If the queue is full, evict the stale entry and replace with fresher one.
-        A newer frame is always more useful than an older one.
-        """
+    def _enqueue(self, event: VisionEvent) -> None:
         try:
             self._queue.put_nowait(event)
         except asyncio.QueueFull:

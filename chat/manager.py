@@ -1,8 +1,4 @@
-"""Fan-in for all enabled chat platforms into a single asyncio queue.
-
-Per-platform monitors are imported lazily so a missing SDK only breaks the
-specific platform that depends on it.
-"""
+"""Fan-in for all enabled chat platforms into a single asyncio queue."""
 from __future__ import annotations
 
 import asyncio

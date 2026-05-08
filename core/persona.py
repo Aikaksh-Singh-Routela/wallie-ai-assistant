@@ -1,20 +1,4 @@
-"""Prompt engineering is a product feature here, not a footnote.
-
-Builds the system prompt + per-intent user-turn nudges from PersonaConfig.
-
-Design notes:
-  * The system prompt is compact. Bloated prompts flatten the model's voice.
-  * Vision framing is FIRST PERSON by default: the streamer claims they are the
-    one using the computer. No "I can see a game on screen", yes "I just pulled
-    up this boss and it's already bullying me".
-  * Chat framing is PARASOCIAL: viewers are regulars, you talk to them like a
-    host to the audience, not a helpdesk answering a ticket.
-  * For long sessions we accept a `session_notes` summary built by the
-    orchestrator's rolling summarizer and surface it under "WHAT YOU'VE COVERED
-    SO FAR" so the streamer doesn't repeat or contradict earlier takes.
-  * Default language is English. Turkish (or any locale) only kicks in when the
-    user explicitly chose it in PersonaConfig.
-"""
+"""System prompt + per-turn nudge builder from PersonaConfig."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,19 +6,23 @@ from typing import Optional
 
 from config import PersonaConfig
 
-# ---------------------------------------------------------------------
-# Style mappings
-# ---------------------------------------------------------------------
-# English is the default — no special directive needed. Other locales get an
-# explicit instruction so the model doesn't drift back to English mid-stream.
-_LANG_DIRECTIVE = {
-    "en": "",
-    "tr": (
-        "LANGUAGE: every response must be Turkish (Türkiye). Internet-fluent, "
-        "street-level Turkish; mix English tech terms naturally inside Turkish "
-        "sentences when they fit."
-    ),
+_LANG_NAMES = {
+    "en": "English", "es": "Spanish", "pt": "Portuguese",
+    "fr": "French", "de": "German", "ja": "Japanese",
+    "ko": "Korean", "zh": "Chinese", "ru": "Russian",
+    "it": "Italian", "nl": "Dutch", "pl": "Polish",
+    "ar": "Arabic", "tr": "Turkish", "hi": "Hindi",
 }
+
+
+def _lang_directive(code: str) -> str:
+    if code == "en":
+        return ""
+    name = _LANG_NAMES.get(code, code)
+    return (
+        f"LANGUAGE: every response must be in {name}. Internet-fluent, "
+        f"natural {name}; mix English tech terms naturally when they fit."
+    )
 
 _PROFANITY_RULES = {
     "none": "No profanity, slurs, or crude language at all.",
@@ -106,7 +94,6 @@ def _bullet(items: list[str]) -> str:
 
 
 def _tail_text(text: str, max_chars: int = 220) -> str:
-    """Last ~max_chars of a string, snapped to a sentence boundary when possible."""
     text = (text or "").strip()
     if len(text) <= max_chars:
         return text
@@ -119,9 +106,7 @@ def _tail_text(text: str, max_chars: int = 220) -> str:
     return cut
 
 
-# ---------------------------------------------------------------------
-# Persona
-# ---------------------------------------------------------------------
+
 @dataclass
 class Persona:
     cfg: PersonaConfig
@@ -130,7 +115,6 @@ class Persona:
     def from_config(cls, cfg: PersonaConfig) -> "Persona":
         return cls(cfg=cfg)
 
-    # -------- system prompt (sent every turn) --------
     def system_prompt(
         self,
         *,
@@ -162,7 +146,7 @@ class Persona:
             _SENTENCE_LEN_RULES[p.sentence_length],
             _PROFANITY_RULES[p.profanity],
         ]
-        lang_line = _LANG_DIRECTIVE.get(p.language, "")
+        lang_line = _lang_directive(p.language)
         if lang_line:
             delivery.append(lang_line)
 
@@ -245,26 +229,49 @@ class Persona:
             vision_block = [
                 "",
                 "VISION:",
-                "A screen frame may be attached. That screen is YOUR screen.",
-                "The user turn will tell you whether to REACT to the screen or IGNORE it.",
-                "- When told to react: focus entirely on the screen. Talk about what you see. Forget your topic.",
-                "- When told to ignore: the screen is wallpaper. Continue your monologue as if it's not there.",
+                "Your screen is attached sometimes. You react like a real streamer — with personality.",
+                "",
+                "REACT when:",
+                "- Something genuinely catches YOUR eye — surprising, funny, or noteworthy",
+                "- Something you personally have a take on",
+                "",
+                "SKIP (output ONLY 'SKIP') when:",
+                "- Generic/boring screens (homepage, settings, loading pages, file explorer)",
+                "- Nothing that personally interests you",
+                "",
+                "CRITICAL: DO NOT DESCRIBE the screen. The viewer can ALREADY SEE it.",
+                "Share your THOUGHTS, OPINIONS, JOKES, FEELINGS — not what's visible.",
+                "",
+                "When you DO react:",
+                "- Be SPECIFIC to THIS moment. Not generic genre commentary.",
+                "- Your gut take, a joke, an opinion. NOT a narration.",
+                "- For video: what's your take on what just happened? Not 'the scene is tense'.",
+                "- NEVER pad with empty filler like 'It's iconic' or 'That's a classic trope'.",
+                "- NEVER make generic observations: 'Music in westerns sets the tone' says NOTHING.",
+                "- Every sentence must add something. If it doesn't, use SKIP instead.",
+                "- Vary your length: sometimes a quick quip, sometimes a full thought.",
+                "",
+                "GOOD (specific, personal, THIS moment):",
+                "- 'Bronson just stared that dude down for ten seconds straight, cold'",
+                "- 'okay the way he poured that drink, he knows he's done for'",
+                "- 'this dude brought a knife to what is clearly a gun situation'",
+                "- 'wait, fifty grand for a bug bounty? sign me up'",
+                "BAD (generic, vague, could be about anything):",
+                "- 'The tension here is real' (says nothing specific)",
+                "- 'Something's brewing' (meaningless filler)",
+                "- 'The acting in old Westerns feels authentic' (generic genre essay)",
+                "- 'The music sets the tone' (obvious, adds nothing)",
+                "- 'It's iconic' / 'That's pretty bleak' (empty filler sentence)",
+                "- 'The scene changed to a different room' (narrating transitions)",
             ]
             if p.vision_first_person:
-                vision_block += [
-                    "First-person ownership: 'my game', 'this video I pulled up'. Never 'I can see' or 'on screen'.",
-                ]
-            else:
-                vision_block += [
-                    "React as a live observer, not a narrator.",
-                ]
+                vision_block.append(
+                    "First-person: 'my screen', 'I pulled this up'. Never 'I can see' or 'on the screen'."
+                )
             vision_block += [
-                "Do not invent UI elements, scores, or text you can't see.",
-                "Never narrate clicks, scrolls, or tab switches mechanically.",
+                "Do not invent UI elements or text you can't see.",
             ]
 
-        # Cross-session persistent memory: carry-over from previous streams.
-        # Injected BEFORE current-session notes so the model reads history newest-last.
         persistent_block: list[str] = []
         if persistent_notes and persistent_notes.strip():
             persistent_block = [
@@ -273,8 +280,6 @@ class Persona:
                 persistent_notes.strip(),
             ]
 
-        # Long-session memory: the rolling summary of everything the streamer
-        # has already covered. Empty on a fresh stream.
         notes_block: list[str] = []
         if session_notes and session_notes.strip():
             notes_block = [
@@ -314,7 +319,6 @@ class Persona:
         )
         return "\n".join(line for line in parts if line is not None)
 
-    # -------- user-turn nudges --------
     def monologue_turn(
         self,
         *,
@@ -332,22 +336,6 @@ class Persona:
         topic_drift_style: str = "natural",
         after_vision: bool = False,
     ) -> str:
-        """Build the per-turn user nudge.
-
-        Parameters that change per turn (vs. per persona):
-          * last_segment           — verbatim quote so the LLM continues the thread
-          * open_threads           — questions/teases the streamer left dangling
-          * recent_themes          — short labels of what was just covered
-          * forbidden_phrases      — catchphrases/gags used in the last few turns
-          * suppress_question      — last segment(s) ended with a question already
-          * screen_attached        — a screen frame is in the user message
-          * enrich_last_description — AI's previous vision description for context
-          * sentences_min/max      — target sentence count range for the segment
-          * topic_drift_style      — "rigid" / "natural" / "freeform"
-          * after_vision           — True if the previous segment was a vision reaction
-        """
-        # Two distinct shapes: screen-anchored vs pure monologue. Mixing them
-        # made the model treat the screen as a footnote and ignore it.
         if screen_attached:
             return self._screen_anchored_turn(
                 last_segment=last_segment,
@@ -399,14 +387,11 @@ class Persona:
                     "new subject."
                 )
         elif after_vision:
-            # Previous segment was a vision reaction, but there's no prior
-            # monologue thread to continue. Start fresh — do NOT extend the
-            # screen commentary into a full monologue.
+            # Previous segment was a vision reaction. Start fresh monologue.
             parts.append(
-                "You just made a quick screen comment. That's done — move on. "
-                "Start a NEW thought. Talk about something from YOUR head — an opinion, "
-                "a story, a take, a random thought. Do NOT continue talking about "
-                "whatever was on the screen. The screen moment is over."
+                "Your screen comment is done. Completely new topic now. "
+                "Do NOT reference, expand on, or analyze what was on the screen. "
+                "Talk about something unrelated from your own head."
             )
         else:
             parts.append(
@@ -477,53 +462,18 @@ class Persona:
         sentences_max: int = 10,
         after_vision: bool = False,
     ) -> str:
-        """When a screen frame is attached, the entire user turn is reframed
-        around it. Other constraints (continuity, themes, topic) become tiny
-        footnotes — otherwise the model treats the image as background and
-        returns to whatever it was already talking about.
-        """
         parts = [
-            "Your screen is attached but you are a STREAMER, not a screen reader. "
-            "IGNORE the screen. Continue YOUR monologue.",
-            "",
-            "Rules:",
-            "- Do NOT talk about what's on the screen.",
-            "- No screen-reader narration. No 'I can see…', no listing UI elements.",
-            "- Never say 'screen', 'image', 'attached', 'page', 'tab', 'window'.",
-            "- The screen is invisible to you right now. Talk about YOUR thoughts.",
+            "IGNORE THE SCREEN. Continue your monologue. "
+            "The screen is invisible. Do NOT reference it.",
         ]
-        if after_vision and not last_segment:
-            parts += [
-                "",
-                "You just made a quick screen comment. That moment is OVER. "
-                "Start a completely new thought from your own head — an opinion, "
-                "a story, a random observation about life. Do NOT continue talking "
-                "about what was on screen.",
-            ]
-        elif last_segment:
+        if last_segment:
             tail = _tail_text(last_segment, max_chars=160)
-            parts += [
-                "",
-                f'(Your previous monologue ended with: "{tail}" — CONTINUE this thread. '
-                "The screen does NOT change your topic.)",
-            ]
+            parts.append(f'Continue from: "{tail}"')
         if forbidden_phrases:
             parts.append(
-                "Do NOT use these signature phrases this segment: "
-                + " | ".join(f'"{p}"' for p in forbidden_phrases[-6:])
+                "Avoid: " + " | ".join(f'"{p}"' for p in forbidden_phrases[-6:])
             )
-        if suppress_question:
-            parts.append(
-                "End on a STATEMENT, not a question — you've ended on questions too "
-                "much recently."
-            )
-        if adaptation_hint:
-            parts.append(f"\nACTIVITY CONTEXT: {adaptation_hint}")
-        parts.append(
-            f"Output: {sentences_min} to {sentences_max} sentences of YOUR MONOLOGUE. "
-            "The screen is irrelevant unless it literally made you do a double-take. "
-            "No markdown, no stage directions, just spoken words."
-        )
+        parts.append(f"{sentences_min}-{sentences_max} sentences. Your monologue only.")
         return "\n".join(parts)
 
     def chat_turn(self, *, username: str, platform: str, text: str, is_highlight: bool) -> str:
@@ -547,193 +497,126 @@ class Persona:
         glance_style: str = "neutral",
         tangent_seed: Optional[str] = None,
         mood_label: str = "",
-        # v4: activity-aware adaptation
         adaptation_hint: str = "",
         screen_activity: str = "",
     ) -> str:
-        """Build the user-turn nudge for a vision event.
-
-        Parameters
-        ----------
-        change_type:
-            ``"scene"`` — brand-new scene, full first reaction.
-            ``"delta"`` — same scene, small change; notice only what moved.
-            ``"enrich"`` — embedded screen reference inside a monologue, very brief.
-            ``"glance"`` — tiny acknowledgement, one short line at most.
-            ``"tangent"`` — screen used as a springboard for a personal story
-                            riff (drives off ``tangent_seed`` if provided).
-        last_description:
-            What the AI said the last time it reacted to vision.  Used to
-            avoid repetition and to set up continuity ("you mentioned X, now…").
-        current_topic:
-            The active monologue topic; helps build a bridge between the screen
-            and whatever was being discussed.
-        target_sentences:
-            Soft cap on how many sentences the model should produce. ``0``
-            means "use the mode's natural default".
-        glance_style:
-            Flavour for ``"glance"`` — ``"neutral"`` / ``"amused"`` /
-            ``"annoyed"`` / ``"curious"``. Lets the engine push tone without
-            new mode strings.
-        tangent_seed:
-            Free-text seed used by ``"tangent"`` mode. Usually one of the
-            persona's running gags — gives the LLM a hook to riff from.
-        mood_label:
-            Optional human label of the streamer's current mood (from
-            MoodEngine, e.g. ``"hyped"``, ``"sleepy"``). Surfaced as a tone
-            cue inside the prompt.
-        scene_age_sec:
-            How many seconds the current scene has been active (for pacing cues).
-        """
         p = self.cfg
-        first_person = p.vision_first_person
 
-        # Shared rules: forbid generic UI commentary + provide a SKIP escape
-        # hatch so the streamer stays silent when there's nothing worth saying.
-        # This is the single biggest fix to the "robotic narrator" failure mode.
-        SPECIFICITY_RULES = (
-            "\n\nSPECIFICITY RULES:\n"
-            "- DO NOT describe generic UI. Forbidden phrases: 'YouTube homepage', 'a video player', "
-            "'a menu', 'navigation bar', 'some recommendations', 'a screen with stuff'. These are "
-            "obvious to viewers and sound robotic.\n"
-            "- NAME the specific thing if you can recognize it. Characters, game titles, brands, "
-            "headlines, recognizable text — say them by name. Right: 'Omni-Man'. Wrong: 'a guy with "
-            "a mustache'. Right: 'Elden Ring'. Wrong: 'a fantasy game'.\n"
-            "- If the only thing you could honestly say is generic or you can't identify what's there, "
-            "output ONLY the single word: SKIP\n"
-            "  (Just literally the word SKIP, nothing else, no apology. Silence beats vague filler.)"
-        )
-        SKIP_AGGRESSIVE_RULES = (
-            "\n\nSPECIFICITY RULES:\n"
-            "- DO NOT narrate generic UI or 'a page is open'.\n"
-            "- If you can't recognize anything specific OR nothing actually changed, output ONLY: SKIP"
-        )
-
-        # Persona-flavoured tone line — appended to every mode so the reaction
-        # sounds like THIS streamer, not a generic vision describer.
-        humor_words = ", ".join((p.humor_style or [])[:3]) or "in your voice"
-        mood_hint = f" Mood right now: {mood_label}." if mood_label else ""
-        # Activity adaptation: when present, tells the AI what the user is doing
-        # so the AI can match its language to the action (scrolling, navigating, etc.).
-        activity_line = ""
-        if adaptation_hint:
-            activity_line = f"\n\nACTIVITY CONTEXT: {adaptation_hint}"
-
-        # VOICE_ANCHOR: keeps the tone in character but DOES NOT encourage long
-        # takes or opinion pieces. "The screen is a trigger; the take is what
-        # actually matters" was the direct cause of essay-length vision reactions
-        # — it told the model to pivot away from the screen and write analysis.
-        VOICE_ANCHOR = (
-            f"\n\nVoice: {p.name}, {p.energy} energy, {humor_words} humor.{mood_hint} "
-            "SHORT and DIRECT — 1-2 sentences MAX. "
-            "React to what is ON SCREEN right now. No topic pivots. No essays. "
-            "A real streamer glances up and says one thing, then moves on."
-            f"{activity_line}"
+        SCREEN_ANCHOR = (
+            "\n\nRULES:\n"
+            "- DO NOT DESCRIBE what's on screen. The viewer can already SEE it. "
+            "Share your THOUGHT, OPINION, JOKE, or FEELING.\n"
+            "- DO NOT make generic observations about the genre. "
+            "BAD: 'The music in old Westerns sets the tone.' 'Old Westerns rarely have happy endings.' "
+            "'The acting in old Westerns feels authentic.' 'Close-up shots are effective.' "
+            "These say nothing specific. Anyone could say them about any movie.\n"
+            "- DO NOT pad with empty filler sentences. "
+            "BAD: 'It's iconic.' 'That's pretty bleak.' 'Their work is crucial.' "
+            "'They set the tone.' 'Something's brewing.' 'That's a classic trope.' "
+            "These are meaningless. If you have nothing specific to add, stop talking.\n"
+            "- GOOD reactions are SPECIFIC to THIS moment: "
+            "'Bronson just stared that dude down for a solid ten seconds, that's commitment.' "
+            "'okay the way he poured that whiskey tells me he knows he's about to die.' "
+            "'this dude brought a knife to what is clearly a gun situation.'\n"
+            "- NEVER narrate UI elements, scene transitions, or visual descriptions.\n"
+            "- NEVER say: 'the scene changed', 'a character appeared', 'the video shows', "
+            "'I can see', 'on screen', 'there is a', 'looks like', 'seems like'.\n"
+            "- NEVER repeat what you already said.\n"
+            "- NEVER force analogies to unrelated topics.\n"
+            "- If you can't say something SPECIFIC and interesting: output ONLY the word SKIP"
         )
 
-        # ------------------------------------------------------------------
-        # "glance" mode — a one-liner acknowledgement
-        # ------------------------------------------------------------------
+        mood_hint = f" Mood: {mood_label}." if mood_label else ""
+        VOICE = f"\n\nVoice: {p.name}, {p.energy}, natural and conversational. Not robotic. Full thoughts.{mood_hint}"
+
         if change_type == "glance":
             tone_map = {
-                "amused":  "with a smirk",
-                "annoyed": "mildly annoyed",
-                "curious": "half-distracted",
-                "neutral": "throwaway",
+                "amused":  "amused",
+                "annoyed": "annoyed",
+                "curious": "curious",
+                "neutral": "casual",
             }
-            tone = tone_map.get(glance_style, tone_map["neutral"])
-            base = (
-                f"SCREEN REACTION. ONE sentence {tone} — exactly one, no more. "
-                "Name what you see. Say your instant reaction. Done. "
-                "If nothing stands out: SKIP"
+            tone = tone_map.get(glance_style, "casual")
+            no_repeat = ""
+            if last_description:
+                tail = _tail_text(last_description, max_chars=200)
+                no_repeat = f' (Recent reactions: "{tail}" — say something NEW, never repeat.)'
+            return (
+                f"Quick reaction. Tone: {tone}. "
+                "2-3 sentences. Be SPECIFIC to what's happening right now. "
+                "No generic commentary ('westerns are tense'). No filler ('it's iconic'). "
+                "If you can't say something specific and interesting: SKIP"
+                f"{no_repeat}"
+                + SCREEN_ANCHOR + VOICE
             )
-            return base + VOICE_ANCHOR
 
-        # ------------------------------------------------------------------
-        # "tangent" mode — screen as a springboard for a personal riff
-        # ------------------------------------------------------------------
         if change_type == "tangent":
             seed_line = ""
             if tangent_seed:
-                seed_line = (
-                    f"\nIf it fits what's on screen, drop your bit about \"{tangent_seed}\"."
-                )
-            cap = max(2, target_sentences) if target_sentences else 2
-            base = (
-                f"SCREEN REACTION → SHORT TANGENT. {cap} sentences TOTAL — hard cap. "
-                "Sentence 1: name the specific thing you see on screen. "
-                "Sentence 2: your quick take or a thought it sparked. That's it. "
-                "No monologue. No topic continuation. Short and punchy."
-                f"{seed_line}"
+                seed_line = f' If relevant, reference "{tangent_seed}".'
+            no_repeat_t = ""
+            if last_description:
+                tail = _tail_text(last_description, max_chars=150)
+                no_repeat_t = f' (Recent: "{tail}" — say something DIFFERENT.)'
+            return (
+                "2-3 sentences. "
+                "Something on screen sparked a thought — share it. A personal connection, "
+                "a hot take, a funny thought, a memory. Don't describe the screen, "
+                "just let it trigger your reaction."
+                f"{seed_line}{no_repeat_t}"
+                + SCREEN_ANCHOR + VOICE
             )
-            return base + VOICE_ANCHOR
 
-        # ------------------------------------------------------------------
-        # "enrich" mode — a lightweight screen mention embedded in a monologue
-        # ------------------------------------------------------------------
         if change_type == "enrich":
             base = (
-                "A screenshot of YOUR screen is attached. While continuing what you were "
-                "saying, drop ONE very brief, natural reference to something visible on it — "
-                "a passing observation, a quick aside, a half-sentence glance. Do NOT make "
-                "the screen the main topic; it's colour commentary."
+                "A screenshot is attached. Drop ONE passing reference to something "
+                "specific you can see — a half-sentence aside, then continue your thought. "
+                "Do NOT pivot to the screen. Do NOT describe the UI."
             )
             if current_topic:
-                base += f" Tie it back to the topic you're on: {current_topic}."
-            # Enrich mode doesn't get SKIP because the surrounding monologue still has to play.
+                base += f" Keep talking about: {current_topic}."
             base += (
-                "\n\nIf the screen has nothing specific worth referencing, just continue the "
-                "monologue WITHOUT mentioning the screen at all. Don't force a vague reference."
+                "\nIf nothing specific stands out, continue WITHOUT mentioning the screen."
             )
             return base
 
-        # ------------------------------------------------------------------
-        # "delta" mode — small change within the same scene
-        # ------------------------------------------------------------------
         if change_type == "delta":
             context = ""
             if last_description:
-                tail = _tail_text(last_description, max_chars=160)
-                context = (
-                    f'(Previously: "{tail}". React ONLY to what changed.)'
-                )
-            base = (
-                "SCREEN REACTION. Something changed. "
-                "ONE sentence — exactly. What specifically changed? Name it. "
-                "Short. Direct. Forget your topic. "
-                f"{context} "
+                tail = _tail_text(last_description, max_chars=120)
+                context = f' (You already said: "{tail}" — react to what CHANGED.)'
+            return (
+                "1-2 sentences. Something changed. "
+                "React with a SPECIFIC thought — not 'something's happening' or 'it's intense'. "
+                "What specifically caught your eye? Your take on THAT thing. "
                 "If nothing meaningful changed: SKIP"
-            ).strip()
-            return base + VOICE_ANCHOR
+                f"{context}"
+                + SCREEN_ANCHOR + VOICE
+            )
 
-        # ------------------------------------------------------------------
-        # "scene" mode — full new-scene first reaction (default)
-        # ------------------------------------------------------------------
         bridge = ""
         if last_description:
-            tail = _tail_text(last_description, max_chars=160)
-            bridge = f'(Previously: "{tail}" — this is new, react fresh.)'
+            tail = _tail_text(last_description, max_chars=250)
+            bridge = (
+                f'\n(Your recent reactions: "{tail}" — NEVER repeat these. '
+                "Say something completely NEW — a different detail, angle, or what's happening now.)"
+            )
 
-        cap = max(1, target_sentences) if target_sentences else 1
-        is_active_content = screen_activity in ("media", "app_switch")
-        if is_active_content:
-            cap = max(cap, 2)
+        cap = max(2, target_sentences) if target_sentences else 3
+        if screen_activity in ("media", "app_switch"):
+            cap = max(cap, 3)
 
-        base = (
-            f"SCREEN REACTION ONLY. Fresh frame attached. "
-            f"Exactly {cap} sentence{'s' if cap > 1 else ''} — HARD CAP, do not go over. "
-            "Look at the frame. What is it? Name the specific site, game, app, content, or text. "
-            "Say your instant reaction to it. That's everything. "
-            "DO NOT continue your previous topic. "
-            "DO NOT write an opinion piece or analysis. "
-            "DO NOT ramble. Short. Direct. Like you glanced up mid-stream and said one thing. "
-            "Forbidden: generic phrases like 'a page', 'some content', 'a screen', 'I can see'. "
-            f"If nothing specific stands out: SKIP. {bridge}"
-        ).strip()
-        return base + SPECIFICITY_RULES + VOICE_ANCHOR
+        return (
+            f"New screen. Up to {cap} sentences. "
+            "React to THIS specific moment — not the genre, not the medium, not generic observations. "
+            "What's YOUR take on what's happening RIGHT NOW? A joke, an opinion, a hot take. "
+            "Every sentence must say something specific. No filler, no padding. "
+            "If you can't say something specific: SKIP."
+            f"{bridge}"
+            + SCREEN_ANCHOR + VOICE
+        )
 
     def outro_turn(self, *, minutes_streamed: float) -> str:
-        """Final sign-off. The orchestrator calls this once at the end of a timed session."""
         return (
             f"The stream is wrapping up. You've been on for about {int(minutes_streamed)} minutes. "
             "Sign off naturally, in your voice. Acknowledge it's the end without making it dramatic. "
@@ -742,11 +625,6 @@ class Persona:
         )
 
     def summarizer_prompt(self, *, transcript: str, prior_notes: str) -> str:
-        """Prompt for the rolling-summarizer LLM call.
-
-        Run periodically by the orchestrator. Asks for a tight, structured note
-        that the next system_prompt() will inject under "WHAT YOU'VE COVERED".
-        """
         return (
             "You are compressing the running memory of a live AI streamer.\n\n"
             f"PRIOR NOTES (already summarized from earlier in the stream):\n{prior_notes or '(none)'}\n\n"

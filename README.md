@@ -161,8 +161,8 @@ Clone and double-click. No Python knowledge needed.
 
 **Windows:**
 ```
-git clone https://github.com/<your-fork>/wallie.git
-cd wallie
+git clone https://github.com/Alradyin/wallie-V2.git
+cd wallie-V2
 ```
 Double-click **`install.bat`** → then **`start.bat`**. Dashboard opens at `http://127.0.0.1:8765`.
 
@@ -170,8 +170,8 @@ Double-click **`install.bat`** → then **`start.bat`**. Dashboard opens at `htt
 
 **macOS / Linux:**
 ```bash
-git clone https://github.com/<your-fork>/wallie.git
-cd wallie
+git clone https://github.com/Alradyin/wallie-V2.git
+cd wallie-V2
 chmod +x start.sh
 ./start.sh
 ```

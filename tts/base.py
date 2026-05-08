@@ -1,8 +1,4 @@
-"""TTS provider protocol.
-
-All adapters return raw PCM16 little-endian bytes at a known sample rate. Keeping
-decode out of the pipeline removes a significant source of latency and failure.
-"""
+"""TTS provider protocol."""
 from __future__ import annotations
 
 from typing import AsyncIterator, Protocol
@@ -18,7 +14,6 @@ class TTSProvider(Protocol):
     channels: int = 1
 
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
-        """Yield PCM16-LE chunks for the given text."""
         ...
 
     async def aclose(self) -> None:

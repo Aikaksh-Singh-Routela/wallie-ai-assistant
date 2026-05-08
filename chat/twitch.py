@@ -1,9 +1,4 @@
-"""Twitch chat monitor via the IRC gateway.
-
-Anonymous read-only mode works without OAuth if you log in as `justinfan<number>`,
-but an OAuth token unlocks user metadata. We use raw asyncio + websockets for
-minimal overhead and zero extra deps beyond what twitchio already installs.
-"""
+"""Twitch chat monitor via the IRC gateway."""
 from __future__ import annotations
 
 import asyncio
@@ -87,14 +82,12 @@ class TwitchChatMonitor(ChatMonitor):
 
 
 def _parse_privmsg(line: str) -> Optional[tuple[str, str, bool]]:
-    """Return (username, text, is_bits) for a PRIVMSG line, else None."""
     tags = ""
     rest = line
     if line.startswith("@"):
         tags, _, rest = line.partition(" ")
     if "PRIVMSG" not in rest:
         return None
-    # Format: :nick!user@host PRIVMSG #channel :message text
     try:
         prefix, _, payload = rest.partition(" PRIVMSG ")
         nick = prefix.lstrip(":").split("!", 1)[0]

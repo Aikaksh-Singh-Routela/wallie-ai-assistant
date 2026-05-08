@@ -1,8 +1,4 @@
-"""Factory that resolves TTSConfig + Secrets to a concrete TTSProvider.
-
-Each provider module is imported lazily — installing piper-tts is optional and
-not having it shouldn't break Fish/EL users.
-"""
+"""Factory — resolves TTSConfig + Secrets to a concrete TTSProvider."""
 from __future__ import annotations
 
 from config import Secrets, TTSConfig

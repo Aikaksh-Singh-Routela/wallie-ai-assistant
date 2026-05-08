@@ -1,8 +1,4 @@
-"""Shared LLM provider protocol.
-
-Every provider adapter exposes a single async streaming method. Orchestrator and
-vision loop only talk to this interface, so adding a new backend is a single file.
-"""
+"""Shared LLM provider protocol."""
 from __future__ import annotations
 
 from typing import Any, AsyncIterator, Protocol
@@ -27,9 +23,7 @@ class LLMProvider(Protocol):
         presence_penalty: float = 0.0,
         frequency_penalty: float = 0.0,
     ) -> AsyncIterator[str]:
-        """Yield text tokens as they arrive. Stops when the provider closes the stream."""
         ...
 
     async def aclose(self) -> None:
-        """Release any long-lived resources (HTTP clients, etc.)."""
         ...

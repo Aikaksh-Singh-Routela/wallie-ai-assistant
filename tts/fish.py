@@ -1,8 +1,4 @@
-"""Fish Audio TTS adapter (streaming PCM).
-
-Uses the HTTP streaming endpoint which yields audio bytes as the model generates
-them. Requesting PCM output removes the MP3 decode step from the hot path.
-"""
+"""Fish Audio TTS adapter (streaming PCM)."""
 from __future__ import annotations
 
 from typing import AsyncIterator

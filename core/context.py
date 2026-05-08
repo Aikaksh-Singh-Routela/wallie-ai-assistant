@@ -1,21 +1,4 @@
-"""Single conversation history for the streamer.
-
-Long streams (1h+) need more than a flat rolling buffer. We keep the last N
-assistant turns verbatim — useful for dedupe and tight continuity — and fold
-everything older into a "session_notes" string that the orchestrator updates
-periodically with an LLM summarizer.
-
-The system prompt then receives:
-
-    <persona block>
-
-    SESSION NOTES (everything you said earlier, compressed):
-    <session_notes>
-
-    <recent verbatim history as chat messages>
-
-This bounds prompt size while preserving the show's continuity across hours.
-"""
+"""Conversation history with sliding window and rolling summary."""
 from __future__ import annotations
 
 import time
@@ -44,14 +27,9 @@ class Message:
 
 @dataclass
 class Conversation:
-    """Sliding-window history with a rolling summary for long sessions."""
-
-    # Hard caps; reachable only if the summarizer is asleep.
     max_messages: int = 200
     max_chars: int = 60000
-    # How many assistant turns we keep verbatim before they may be summarized.
     recent_verbatim_turns: int = 24
-    # Sliding dedupe window for repeat detection.
     recent_assistant_window: int = 30
 
     _messages: list[Message] = field(default_factory=list)
@@ -61,6 +39,7 @@ class Conversation:
     total_segments: int = 0
 
     # ----- mutation -----
+
     def add_user(
         self,
         content: str,
@@ -102,18 +81,16 @@ class Conversation:
         for prior in self._recent_assistant[-window:]:
             if similarity(candidate, prior) >= threshold:
                 return True
+            for sentence in prior.split(". "):
+                sentence = sentence.strip().rstrip(".")
+                if sentence and similarity(candidate, sentence) >= threshold:
+                    return True
         return False
 
     def session_seconds(self) -> float:
         return time.time() - self.session_started_at
 
-    # ----- summarizer hooks -----
     def messages_eligible_for_summary(self) -> list[Message]:
-        """Return assistant turns older than the verbatim window. The orchestrator
-        passes these to the summarizer LLM and then calls compact_history()."""
-        # Walk from the start until we have all but the last `recent_verbatim_turns`
-        # assistant turns. Keep user turns interleaved with their assistants so the
-        # summary has context.
         assistant_idxs = [i for i, m in enumerate(self._messages) if m.role == "assistant"]
         if len(assistant_idxs) <= self.recent_verbatim_turns:
             return []
@@ -121,7 +98,6 @@ class Conversation:
         return [m for m in self._messages[:cutoff] if m.role in ("assistant", "user")]
 
     def compact_history(self, new_session_notes: str) -> None:
-        """After summarizing, drop everything older than the verbatim window."""
         assistant_idxs = [i for i, m in enumerate(self._messages) if m.role == "assistant"]
         if len(assistant_idxs) <= self.recent_verbatim_turns:
             self.session_notes = new_session_notes.strip()
@@ -130,10 +106,8 @@ class Conversation:
         self._messages = self._messages[cutoff:]
         self.session_notes = new_session_notes.strip()
 
-    # ----- internals -----
     def _enforce_caps(self) -> None:
         if len(self._messages) > self.max_messages:
-            # Drop oldest non-system messages.
             overflow = len(self._messages) - self.max_messages
             kept: list[Message] = []
             dropped = 0
@@ -151,13 +125,21 @@ class Conversation:
                 continue
             total -= len(self._messages.pop(i).content)
 
-    # ----- provider export -----
-    def to_provider_messages(self, system_prompt: str) -> list[dict[str, Any]]:
+    def to_provider_messages(
+        self, system_prompt: str, *, max_images: int = 4
+    ) -> list[dict[str, Any]]:
+        image_budget = max_images
+        keep_images: set[int] = set()
+        for i in range(len(self._messages) - 1, -1, -1):
+            if self._messages[i].images and image_budget > 0:
+                keep_images.add(i)
+                image_budget -= 1
+
         out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-        for m in self._messages:
+        for i, m in enumerate(self._messages):
             if m.role == "system":
                 continue
-            if m.images:
+            if m.images and i in keep_images:
                 blocks: list[dict[str, Any]] = [{"type": "text", "text": m.content}]
                 for img in m.images:
                     blocks.append({"type": "image", "data": img.data, "mime": img.mime})

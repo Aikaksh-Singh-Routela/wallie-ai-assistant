@@ -1,10 +1,4 @@
-"""Provider factory: map LLMConfig + Secrets to a concrete LLMProvider.
-
-Imports for each provider module are deferred until that provider is actually
-selected. This means a user who only configures Groq doesn't need the Anthropic
-or Google SDKs installed — and a missing SDK produces a clear error instead of
-breaking startup.
-"""
+"""Provider factory — maps LLMConfig + Secrets to a concrete LLMProvider."""
 from __future__ import annotations
 
 from config import LLMConfig, Secrets

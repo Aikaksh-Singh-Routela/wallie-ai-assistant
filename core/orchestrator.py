@@ -1,29 +1,4 @@
-"""The single pipeline.
-
-Everything the streamer says goes through one place:
-
-    intent  ->  LLM stream (tokens)
-              ->  SentenceStreamer (sentences)
-              ->  TTS.synthesize (PCM chunks)
-              ->  AudioPlayer.write
-
-A single turn looks like "decide intent, speak one segment, update history, loop".
-Intents are ranked by urgency:
-
-    1. Highlight chat (super chat / bits / donation)  -> barge in, reply
-    2. Vision change event                            -> react on next turn
-    3. Ordinary chat                                  -> reply if under rate limit
-    4. Monologue                                      -> default fallback
-
-Long sessions:
-  * If session_duration_min > 0, the loop schedules a single OUTRO segment
-    (signed off in character) when time-remaining drops under outro_seconds,
-    then stops itself.
-  * Every summarize_every_n delivered segments, a background task asks the LLM
-    to compact the older portion of the history into rolling session_notes.
-    That compressed memory is injected into the system prompt so the streamer
-    keeps continuity across an hour-plus stream without bloating the context.
-"""
+"""Single pipeline — intent selection, LLM streaming, TTS, and audio playback."""
 from __future__ import annotations
 
 import asyncio
@@ -61,9 +36,7 @@ class Intent:
     kind: IntentKind
     chat: Optional[ChatMessage] = None
     vision: Optional[VisionEvent] = None
-    urgent: bool = False  # True -> interrupt current segment
-    # When AttentionEngine routes a vision event, the directive flows through
-    # so persona.vision_turn / monologue_turn can shape the prompt accordingly.
+    urgent: bool = False
     vision_directive: Optional[VisionDirective] = None
 
 
@@ -107,57 +80,35 @@ class Orchestrator:
         self._last_chat_reply_ts = 0.0
         self._current_topic: Optional[str] = None
         self._last_spoken: str = ""
-        self._last_monologue_spoken: str = ""   # only monologue/chat, never vision
+        self._last_monologue_spoken: str = ""
         self._last_intent_kind: str = ""
         self._session_start_ts: float = 0.0
         self._outro_done: bool = False
         self._segments_since_summary: int = 0
-        # Continuity trackers — fed back to the LLM each monologue turn.
-        # Open threads: questions or teases the streamer left dangling. Each
-        # next segment must pay them off before pivoting.
         self._open_threads: list[str] = []
-        # Theme tags: short labels of what each recent segment covered.
-        # Used to remind the model not to circle back to the same angle.
         self._recent_themes: list[str] = []
-        # Phrase cooldown: catchphrases/gags used in recent segments, with the
-        # segment index they were used in. Keeps signature lines from getting
-        # repetitive.
         self._phrase_uses: dict[str, int] = {}
-        # Track segments that ended with a question — used to throttle the
-        # "every segment ends in a question" failure mode.
         self._segments_ended_with_question: int = 0
-        # Latest screen frame. Updated whenever a vision event arrives. We
-        # consume it ONLY for vision-intent segments. Monologue turns never
-        # get the raw frame attached — vision-capable models ignore "IGNORE"
-        # instructions and narrate the screen regardless.
+        # Only consumed for vision-intent segments, never monologue.
         self._latest_frame: Optional["VisionEvent"] = None
         self._latest_frame_ts: float = 0.0
-        # Scene memory: tracks what the AI last described so it can build on it.
         self._scene_memory: SceneMemory = SceneMemory()
-        # User behavior tracker: tracks what the user is doing with the screen
-        # (scrolling, navigating, settled, etc.) for organic adaptation.
         self._behavior: UserBehaviorTracker = UserBehaviorTracker()
-        # Organic decision layer. AttentionEngine picks the next vision reaction
-        # type (deep / glance / tangent / ignore / silence). MoodEngine feeds it
-        # a slow energy/focus signal that drifts naturally over the stream.
         self._mood = MoodEngine(base_energy=self._cfg.persona.energy)
         self._attention = AttentionEngine(
             organicity=self._cfg.vision.organicity,
             min_vision_react_interval=self._cfg.vision.min_vision_react_interval_sec,
         )
-        # Track when we last actually delivered a vision-anchored segment so the
-        # policy can enforce a minimum re-react interval.
         self._last_vision_turn_ts: float = 0.0
-        # Last directive picked by the attention engine, kept around so that
-        # _build_user_turn can read it for the monologue/vision prompts.
         self._pending_directive: Optional[VisionDirective] = None
-        # Break system: periodic pauses like a real streamer.
+        self._last_segment_spoken_ts: float = time.time()
+        self._target_silence_sec: float = random.uniform(5.0, 12.0)
         self._on_break = False
         self._next_break_at = float("inf")
         self._enrich_this_turn = False
         self._break_event: asyncio.Event = asyncio.Event()
 
-    # ----- lifecycle -----
+    # --- lifecycle ---
     async def start(self) -> None:
         if self._running:
             return
@@ -203,7 +154,7 @@ class Orchestrator:
             self._memory.save()
         logger.info("orchestrator: stopped")
 
-    # ----- public status (for dashboard) -----
+    # --- status ---
     def status(self) -> dict[str, Any]:
         elapsed = time.time() - self._session_start_ts if self._session_start_ts else 0.0
         d = self._cfg.orchestrator.session_duration_min
@@ -235,12 +186,22 @@ class Orchestrator:
             ),
         }
 
-    # ----- main loop -----
+    # --- main loop ---
     async def _run(self) -> None:
         try:
             self._current_topic = self._pick_next_topic()
+
+            if self._cfg.vision.enabled and self._vision_queue is not None:
+                for _ in range(20):  # up to 2 seconds
+                    if not self._vision_queue.empty():
+                        break
+                    await asyncio.sleep(0.1)
+                if not self._vision_queue.empty():
+                    logger.info("orchestrator: first vision frame ready")
+                else:
+                    logger.debug("orchestrator: no vision frame after 2s, starting anyway")
+
             while self._running:
-                # Time check FIRST: if we've crossed the outro line, do that and stop.
                 if self._should_outro() and not self._outro_done:
                     intent: Intent = Intent(kind="outro")
                     self._outro_done = True
@@ -258,7 +219,6 @@ class Orchestrator:
                     except asyncio.CancelledError:
                         pass
 
-                # Pre-segment avatar cue: visible "loading my next thought" beat.
                 await self._cue_intent_expression(intent)
 
                 self._segment_task = asyncio.create_task(self._run_segment(intent), name="segment")
@@ -268,39 +228,33 @@ class Orchestrator:
                     pass
 
                 if intent.kind == "outro":
-                    # Wait for the outro audio to finish and then exit.
                     await self._player.wait_drained()
                     logger.info("orchestrator: outro played, stopping")
                     break
 
-                # Maybe trigger a background summarize cycle.
-                self._maybe_kick_summarizer()
+                if (intent.kind == "vision" and intent.vision_directive
+                        and intent.vision_directive.reaction not in (
+                            VisionReaction.SILENCE, VisionReaction.IGNORE)):
+                    await asyncio.sleep(random.uniform(1.5, 3.0))
 
-                # Slow mood drift + avatar mood sync.
+                self._maybe_kick_summarizer()
                 self._mood.tick()
                 await self._sync_mood_to_avatar()
 
-                # Pipeline overlap: instead of waiting for ALL audio to drain,
-                # start preparing the next segment while audio is still playing.
-                # This eliminates the 3-5 second gap between segments.
                 lookahead = self._cfg.orchestrator.max_audio_lookahead_sec
                 if not self._has_urgent_pending():
                     if lookahead > 0:
-                        # Wait until audio queue drops below the lookahead threshold.
                         while (self._player.seconds_queued() > lookahead
                                and self._running
                                and not self._has_urgent_pending()):
                             await asyncio.sleep(0.1)
-                        # Mood-driven breathing gap when audio is nearly drained.
                         if self._player.seconds_queued() < 0.5:
                             gap = self._compute_breathing_gap()
                             if gap > 0:
                                 await asyncio.sleep(gap)
                     else:
-                        # lookahead=0: old behavior, full drain.
                         await self._player.wait_drained()
 
-                # Periodic break: drain audio first, then pause.
                 if self._should_take_break():
                     await self._player.wait_drained()
                     await self._take_break()
@@ -308,7 +262,7 @@ class Orchestrator:
         except Exception as e:
             logger.exception(f"orchestrator: fatal error: {e}")
 
-    # ----- session timing -----
+    # --- session timing ---
     def _should_outro(self) -> bool:
         d = self._cfg.orchestrator.session_duration_min
         if d <= 0 or not self._session_start_ts:
@@ -322,25 +276,19 @@ class Orchestrator:
             return False
         return (time.time() - self._session_start_ts) >= d * 60.0 and self._outro_done
 
-    # ----- intent selection -----
+    # --- intent ---
     async def _choose_intent(self) -> Intent:
-        # 1. Highlight chat always preempts.
         highlight = self._pop_highlight_chat()
         if highlight:
             self._mood.on_highlight_chat()
             return Intent(kind="chat", chat=highlight, urgent=True)
 
-        # 2. Vision event present → consult AttentionEngine for the organic call.
         vision = self._pop_latest_vision()
         if vision is not None:
-            # Hard cooldown: if the last vision-anchored segment was too recent,
-            # skip the attention engine entirely and fall through to monologue.
-            # Media/game content gets a much shorter hard floor — the streamer
-            # needs to keep reacting to what the audience is watching.
             vcfg = self._cfg.vision
             is_active_content = vision.activity.value in ("media", "app_switch")
             hard_floor = (
-                vcfg.min_vision_react_interval_sec * 0.45 if is_active_content
+                vcfg.min_vision_react_interval_sec * 0.40 if is_active_content
                 else vcfg.min_vision_react_interval_sec * 0.65
             )
             since_last_vision = time.time() - self._last_vision_turn_ts
@@ -349,18 +297,31 @@ class Orchestrator:
                     f"vision: hard cooldown ({since_last_vision:.1f}s < "
                     f"{hard_floor:.1f}s, active_content={is_active_content}), skipping"
                 )
-                vision = None  # fall through to chat/monologue
+                vision = None
 
             if vision is not None:
-                directive = self._decide_vision_reaction(vision)
-                self._pending_directive = directive
-                logger.debug(f"attention: {directive.rationale}")
+                interest = self._estimate_interest(vision)
+                threshold = self._cfg.vision.min_engagement_for_react
+                if interest < threshold:
+                    logger.debug(
+                        f"vision: interest {interest:.2f} < {threshold} "
+                        f"(activity={vision.activity.value}), auto-IGNORE"
+                    )
+                    self._attention.on_vision_ignored()
+                    vision = None
+                    directive = None
+                else:
+                    directive = self._decide_vision_reaction(vision)
+                    self._pending_directive = directive
+                    logger.info(
+                        f"vision step2: {directive.reaction.value} "
+                        f"(interest={interest:.2f}, activity={vision.activity.value}, "
+                        f"change={vision.change_type.value}) — {directive.rationale}"
+                    )
             else:
                 directive = None
 
             if directive is not None and directive.reaction == VisionReaction.SILENCE:
-                # Take a beat. Don't generate audio this turn — but still mark
-                # the silent slot so the speech-loop sleeps briefly.
                 self._mood.on_silence_beat()
                 self._attention.on_silence_beat()
                 return Intent(kind="monologue", vision=None,
@@ -371,25 +332,20 @@ class Orchestrator:
                               ))
 
             if directive is not None and directive.reaction == VisionReaction.IGNORE:
-                # Pretend the vision event didn't happen.
                 self._attention.on_vision_ignored()
-                # Fall through to chat / monologue selection below.
             elif directive is not None and directive.reaction in (
                 VisionReaction.DEEP, VisionReaction.GLANCE, VisionReaction.TANGENT,
             ):
-                # Vision-anchored segment.
                 self._mood.on_scene_change()
                 self._attention.on_scene_change()
                 return Intent(kind="vision", vision=vision, urgent=False,
                               vision_directive=directive)
 
-        # 3. Ordinary chat under rate limit.
         ordinary = self._pop_ordinary_chat()
         if ordinary:
             self._mood.on_ordinary_chat()
             return Intent(kind="chat", chat=ordinary, urgent=False)
 
-        # 4. Should we hold a silence beat instead of monologuing again?
         if self._cfg.vision.organic_vision and self._attention.should_hold_silence(
             mood_silence_probability=self._mood.silence_probability(),
             in_monologue_flow=self._segments_in_monologue_flow() >= 2,
@@ -401,38 +357,82 @@ class Orchestrator:
                 rationale="silence-beat: monologue chain too long",
             ))
 
-        # 5. Enrich monologue: probabilistically snap a live frame and attach it so
-        # the AI has the screen as additional context even without a change event.
-        # CRITICAL: this flag controls whether _build_user_turn attaches a screen
-        # frame. Without it, every cached frame leaks into every monologue and the
-        # LLM talks about the screen for 10 minutes straight.
         self._enrich_this_turn = False
         vcfg = self._cfg.vision
-        if (
-            vcfg.enabled
-            and vcfg.enrich_monologue
-            and self._vision_loop is not None
-            and random.random() < vcfg.enrich_probability
-        ):
-            evt = await self._vision_loop.grab_now()
-            if evt is not None:
-                self._latest_frame = evt
-                self._latest_frame_ts = time.time()
-                self._enrich_this_turn = True
-                logger.debug("vision: enrich_monologue — fresh frame grabbed for monologue turn")
+        if vcfg.enabled and self._vision_loop is not None:
+            since_last_spoken = time.time() - self._last_segment_spoken_ts
+            if (
+                since_last_spoken >= self._target_silence_sec
+                and self._latest_frame is not None
+                and self._mood.wants_vision_engagement() > 0.3
+            ):
+                evt = self._latest_frame
+                age = time.time() - self._latest_frame_ts if self._latest_frame_ts else 9999.0
+                if age > vcfg.max_frame_age_sec:
+                    fresh = await self._vision_loop.grab_now()
+                    if fresh is not None:
+                        evt = fresh
+                        self._latest_frame = fresh
+                        self._latest_frame_ts = time.time()
+                fb_energy = (self._mood.arousal + self._mood.talkativity) / 2.0
+                fb_roll = random.random()
+                if fb_roll < 0.25 and fb_energy > 0.45:
+                    fb_reaction = VisionReaction.DEEP
+                    fb_sentences = random.choice([3, 4, 4, 5])
+                elif fb_roll < 0.40:
+                    fb_reaction = VisionReaction.TANGENT
+                    fb_sentences = random.choice([2, 3, 3])
+                else:
+                    fb_reaction = VisionReaction.GLANCE
+                    fb_sentences = random.choice([1, 2, 2, 3])
+                directive = VisionDirective(
+                    reaction=fb_reaction,
+                    target_sentences=fb_sentences,
+                    rationale=f"fallback: silence too long → {fb_reaction.value}",
+                    is_fallback=True,
+                )
+                self._pending_directive = directive
+                logger.info(
+                    f"vision: fallback {fb_reaction.value} after {since_last_spoken:.0f}s "
+                    f"(target was {self._target_silence_sec:.0f}s)"
+                )
+                return Intent(kind="vision", vision=evt, urgent=False,
+                              vision_directive=directive)
+
+            return Intent(kind="monologue", vision_directive=VisionDirective(
+                reaction=VisionReaction.SILENCE, target_sentences=0,
+                rationale="vision-mode: quiet between reactions",
+            ))
 
         return Intent(kind="monologue")
 
-    # ----- vision policy bridge -----
+    # --- interest pre-filter ---
+    def _estimate_interest(self, vision: "VisionEvent") -> float:
+        _ACTIVITY_SCORES: dict[str, float] = {
+            "static": 0.10,
+            "micro": 0.05,
+            "scroll": 0.20,
+            "typing": 0.00,
+            "navigation": 0.50,
+            "app_switch": 0.70,
+            "media": 0.60,
+        }
+        if vision.change_type == ChangeType.SCENE_CHANGE:
+            return 1.0
+        score = _ACTIVITY_SCORES.get(vision.activity.value, 0.15)
+        if vision.user_pattern == "settled":
+            score += 0.15
+        if self._behavior.is_rapid_browsing:
+            score *= 0.30
+        return min(1.0, score)
+
+    # --- vision policy ---
     def _decide_vision_reaction(self, vision: "VisionEvent") -> VisionDirective:
-        """Run the AttentionEngine on a fresh vision event."""
         change_kind = "scene" if vision.change_type == ChangeType.SCENE_CHANGE else "delta"
-        # Mid-thread protection: if the streamer just posed a question or teased
-        # a story, downgrade DELTA reactions so the thread can finish.
+        # Mid-thread: downgrade DELTA so open thread can finish.
         force_glance = bool(self._open_threads) and change_kind == "delta"
 
         if not self._cfg.vision.organic_vision:
-            # Backward-compatible "always deep" fallback.
             return VisionDirective(
                 reaction=VisionReaction.DEEP, target_sentences=3,
                 rationale="organic_vision off → DEEP",
@@ -449,7 +449,6 @@ class Orchestrator:
             in_monologue_flow=self._segments_in_monologue_flow() >= 2,
             segments_total=self._conv.total_segments,
             tangent_seeds=list(self._cfg.persona.running_gags or []),
-            # v4: screen activity context for organic adaptation
             screen_activity=vision.activity.value,
             user_pattern=vision.user_pattern or self._behavior.current_pattern,
             user_settled=self._behavior.is_settled,
@@ -465,7 +464,6 @@ class Orchestrator:
         return directive
 
     def _segments_in_monologue_flow(self) -> int:
-        """Count how many of the last assistant turns were monologue-kind."""
         count = 0
         for m in reversed(self._conv.messages()):
             if m.role != "assistant":
@@ -479,18 +477,31 @@ class Orchestrator:
     def _has_urgent_pending(self) -> bool:
         return self._pop_highlight_chat_peek() is not None
 
-    # ----- breathing gap & break system -----
+    # --- silence & breathing ---
+    def _compute_next_silence_target(self) -> float:
+        energy = (self._mood.arousal + self._mood.talkativity) / 2.0
+        if energy > 0.65:
+            lo, hi = 3.0, 8.0
+        elif energy > 0.45:
+            lo, hi = 6.0, 14.0
+        elif energy > 0.3:
+            lo, hi = 10.0, 20.0
+        else:
+            lo, hi = 15.0, 28.0
+        base = random.uniform(lo, hi)
+        jitter = base * random.uniform(-0.25, 0.25)
+        target = max(2.0, base + jitter)
+        logger.debug(f"silence target: {target:.1f}s (energy={energy:.2f})")
+        return target
+
     def _compute_breathing_gap(self) -> float:
-        """Mood-driven variable pause between segments."""
         oc = self._cfg.orchestrator
         lo = oc.min_inter_segment_gap_sec
         hi = oc.breathing_gap_max_sec
         if hi <= lo:
             return lo
-        # Low talkativity → longer pause, high → shorter.
         t = 1.0 - self._mood.talkativity
         gap = lo + (hi - lo) * t
-        # Small random jitter ±20%.
         gap *= 0.8 + random.random() * 0.4
         return max(lo, min(hi, gap))
 
@@ -512,7 +523,6 @@ class Orchestrator:
     async def _take_break(self) -> None:
         oc = self._cfg.orchestrator
         duration = random.uniform(oc.break_min_sec, oc.break_max_sec)
-        # Tired host takes longer breaks.
         duration *= 0.7 + 0.6 * (1.0 - self._mood.arousal)
         self._on_break = True
         self._break_event.clear()
@@ -641,7 +651,6 @@ class Orchestrator:
         age = time.time() - self._latest_frame_ts if self._latest_frame_ts else 9999.0
         if self._latest_frame is not None and age <= max_age:
             return
-        # Use the loop's on-demand capture path.
         evt = await self._vision_loop.grab_now()
         if evt is not None:
             self._latest_frame = evt
@@ -658,14 +667,12 @@ class Orchestrator:
         the player. This eliminates the inter-sentence silence gaps that the
         previous serial implementation produced.
         """
-        # Silent beat: don't synthesise anything, just take a small breath.
         if intent.vision_directive and intent.vision_directive.reaction == VisionReaction.SILENCE:
-            logger.info("orchestrator: SILENCE beat — skipping segment")
-            await asyncio.sleep(0.6)
+            remaining = self._target_silence_sec - (time.time() - self._last_segment_spoken_ts)
+            pause = min(random.uniform(1.0, 2.0), max(0.5, remaining))
+            await asyncio.sleep(pause)
             return
 
-        # Only vision-intent turns need a guaranteed fresh frame. Monologue
-        # turns never have a frame attached — see _build_user_turn for why.
         if intent.kind == "vision":
             await self._ensure_fresh_screen_frame()
 
@@ -688,34 +695,39 @@ class Orchestrator:
         if intent.kind == "outro":
             max_tok = min(max_tok, 220)
         elif intent.kind == "vision" and intent.vision_directive:
-            # Hard token cap per reaction type — the LLM CANNOT physically
-            # produce a 10-sentence rant about a notes app if we cut it off.
             _vision_tok_caps = {
-                VisionReaction.GLANCE: 35,
-                VisionReaction.DEEP: 70,
-                VisionReaction.TANGENT: 100,
+                VisionReaction.GLANCE: 100,
+                VisionReaction.DEEP: 200,
+                VisionReaction.TANGENT: 120,
             }
             max_tok = min(max_tok, _vision_tok_caps.get(
-                intent.vision_directive.reaction, 120))
+                intent.vision_directive.reaction, 100))
         allow_repeat = intent.kind == "outro"
 
         streamer = SentenceStreamer()
         spoken_parts: list[str] = []
-        # Sentence queue: producer fills, consumer drains. None == EOF.
         sentence_q: asyncio.Queue[Optional[str]] = asyncio.Queue(maxsize=8)
 
-        # vision-only escape hatch: if the model decides the frame is boring
-        # it outputs the literal token SKIP. Producer must detect this on the
-        # first sentence and silently drop the whole segment.
         skip_eligible = intent.kind == "vision"
         skipped = False
 
-        # Hard sentence cap for vision turns — the LLM's "soft guide" is
-        # routinely ignored, so we enforce it in the pipeline. Once the cap
-        # is hit the producer stops feeding sentences and signals EOF.
         vision_sentence_cap = 0
         if intent.kind == "vision" and intent.vision_directive:
-            vision_sentence_cap = min(2, max(1, intent.vision_directive.target_sentences))
+            energy = (self._mood.arousal + self._mood.talkativity) / 2.0
+            if intent.vision_directive.reaction == VisionReaction.GLANCE:
+                if energy > 0.65:
+                    vision_sentence_cap = random.choice([2, 3, 3, 4])
+                elif energy > 0.4:
+                    vision_sentence_cap = random.choice([2, 2, 3, 3])
+                else:
+                    vision_sentence_cap = random.choice([1, 2, 2])
+            elif intent.vision_directive.reaction == VisionReaction.TANGENT:
+                vision_sentence_cap = random.choice([3, 3, 4, 5])
+            else:  # DEEP
+                if energy > 0.6:
+                    vision_sentence_cap = random.choice([4, 5, 5, 6])
+                else:
+                    vision_sentence_cap = random.choice([3, 4, 4, 5])
         produced_sentence_count = 0
 
         async def producer() -> None:
@@ -769,6 +781,15 @@ class Orchestrator:
                 raise
             except Exception as e:
                 logger.warning(f"segment: generation error: {e}")
+                # Backoff on errors (rate limit, safety, etc.) to prevent spam.
+                err_str = str(e).lower()
+                if "429" in err_str or "rate" in err_str or "quota" in err_str:
+                    logger.info("segment: rate-limited, backing off 30s")
+                    await asyncio.sleep(30.0)
+                elif "safety" in err_str or "finish_reason" in err_str:
+                    await asyncio.sleep(2.0)
+                else:
+                    await asyncio.sleep(5.0)
             finally:
                 await sentence_q.put(None)
 
@@ -783,15 +804,12 @@ class Orchestrator:
                     first = False
                     await self._stream_sentence_direct(sent, spoken_parts)
                 else:
-                    # Drain one buffered task before queueing more — this preserves
-                    # play order and keeps memory bounded.
                     if in_flight:
                         audio = await in_flight.pop(0)
                         await self._play_buffered(spoken_parts[-1] if spoken_parts else sent, audio)
                     in_flight.append(asyncio.create_task(self._buffer_tts(sent)))
                     spoken_parts.append(sent)
                     logger.info(f"say> {sent}")
-            # Drain any remaining pre-fired tasks in order.
             for task in in_flight:
                 try:
                     audio = await task
@@ -809,8 +827,6 @@ class Orchestrator:
             self._conv.add_assistant(full, source=intent.kind)
             self._last_spoken = full
             self._last_intent_kind = intent.kind
-            # Vision reactions are momentary asides — they must NOT become
-            # the continuity anchor for subsequent monologue turns.
             if intent.kind != "vision":
                 self._last_monologue_spoken = full
             # Update continuity trackers AFTER each spoken segment.
@@ -818,20 +834,28 @@ class Orchestrator:
             self._update_recent_themes(full)
             self._record_phrase_uses(full)
             self._record_question_ending(full)
-            # Vision memory: record what the AI said so it can build on it later.
-            if intent.kind in ("vision",):
+            is_fallback_vision = (
+                intent.kind == "vision"
+                and intent.vision_directive is not None
+                and intent.vision_directive.is_fallback
+            )
+            if intent.kind == "vision":
                 self._scene_memory.record_spoken(full)
-                self._last_vision_turn_ts = time.time()
-            # Viewer log: persist chat interactions for cross-session memory.
+                if not is_fallback_vision:
+                    self._last_vision_turn_ts = time.time()
             if intent.kind == "chat" and intent.chat is not None and self._memory:
                 self._memory.log_viewer(
                     username=intent.chat.username,
                     platform=intent.chat.platform,
                     text=intent.chat.text,
                 )
-            # Mood + attention bookkeeping.
             self._mood.on_segment_spoken(length_chars=len(full))
-            self._attention.on_segment_spoken(intent_kind=intent.kind)
+            if is_fallback_vision:
+                self._attention.on_segment_spoken(intent_kind="monologue")
+            else:
+                self._attention.on_segment_spoken(intent_kind=intent.kind)
+            self._last_segment_spoken_ts = time.time()
+            self._target_silence_sec = self._compute_next_silence_target()
 
         if intent.kind == "monologue":
             if self._cfg.topics.mode == "list" and random.random() < self._cfg.topics.switch_chance:
@@ -880,8 +904,6 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"tts (direct) failed: {e}")
         finally:
-            # CRITICAL: drop any 1-byte alignment remainder so the next sentence
-            # starts on a clean PCM sample boundary.
             self._player.boundary()
             await self._avatar_safe_call("set_speaking", False)
 
@@ -903,8 +925,6 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"tts (buffered) failed: {e}")
         audio = b"".join(chunks)
-        # Always hand the player even-byte payloads to keep alignment safe even
-        # if the TTS stream was truncated or corrupted mid-flight.
         if len(audio) & 1:
             audio = audio[:-1]
         return audio
@@ -914,7 +934,6 @@ class Orchestrator:
             return
         await self._avatar_safe_call("set_speaking", True)
         try:
-            # Slice into ~40ms chunks for per-frame RMS lipsync. CHUNK is even.
             CHUNK = 1920 * 2  # ~40ms at 24 kHz mono PCM16
             for i in range(0, len(audio), CHUNK):
                 piece = audio[i : i + CHUNK]
@@ -962,10 +981,8 @@ class Orchestrator:
                 f"chat:{m.platform}:{m.username}",
             )
         if intent.kind == "vision" and intent.vision is not None:
-            # Map AttentionEngine reaction → persona vision_turn mode.
             directive = intent.vision_directive
             if directive is None:
-                # Defensive default: full deep reaction.
                 directive = VisionDirective(reaction=VisionReaction.DEEP, target_sentences=3)
             if directive.reaction == VisionReaction.GLANCE:
                 mode = "glance"
@@ -976,7 +993,7 @@ class Orchestrator:
             return (
                 self._persona.vision_turn(
                     change_type=mode,
-                    last_description=self._scene_memory.last_description,
+                    last_description=self._scene_memory.recent_context or self._scene_memory.last_description,
                     current_topic=self._current_topic,
                     scene_age_sec=self._scene_memory.scene_age_sec(),
                     target_sentences=directive.target_sentences,
@@ -993,32 +1010,17 @@ class Orchestrator:
             mins = (time.time() - self._session_start_ts) / 60.0 if self._session_start_ts else 0.0
             return (self._persona.outro_turn(minutes_streamed=mins), [], "outro")
 
-        # Monologue. NEVER attach a raw JPEG frame here — vision-capable models
-        # (Claude, GPT-4o, Gemini) will process any attached image regardless of
-        # how strongly the prompt says "IGNORE the screen". The result is the
-        # model drifting into a multi-minute screen-narration loop.
-        #
-        # enrich_monologue works at the text layer only: the orchestrator already
-        # grabbed a fresh frame for the activity/adaptation hint when the
-        # enrich_probability check passed; we reset the flag and let the normal
-        # monologue prompt run without any image payload.
+        
         images: list[ImageBlock] = []
         screen_attached = False
         if self._enrich_this_turn:
-            # Reset flag — the grab already happened in _choose_intent.
-            # We intentionally do NOT attach the JPEG.
             self._enrich_this_turn = False
             logger.debug("vision: enrich_monologue — flag reset, image intentionally not attached")
 
         forbidden_phrases = self._phrases_to_forbid()
-        # Suppress question-style endings if the last 1-2 segments already
-        # ended with one — prevents the "every line ends with a question" loop.
         suppress_question = self._segments_ended_with_question >= 1
 
         oc = self._cfg.orchestrator
-        # Use the last MONOLOGUE segment as continuity anchor, not the last
-        # vision reaction. Vision asides are momentary — they must not hijack
-        # the monologue thread for the next 10 minutes.
         continuity_segment = self._last_monologue_spoken or None
         return (
             self._persona.monologue_turn(
@@ -1111,7 +1113,6 @@ class Orchestrator:
             stub = phrase.lower().strip()
             if not stub:
                 continue
-            # Match on a stable prefix so paraphrases still register: first 4 words.
             stub_key = " ".join(stub.split()[:4])
             if stub_key and stub_key in low:
                 self._phrase_uses[phrase] = self._conv.total_segments
@@ -1128,23 +1129,14 @@ class Orchestrator:
     def _update_open_threads(self, spoken: str, intent_kind: str) -> None:
         """Detect questions / teases at the end of the last segment so the next
         one can be told to pay them off."""
-        # 1) Anything the streamer just answered is no longer open: drop the most
-        #    recent open thread when this turn was a chat or vision reaction (since
-        #    those branches naturally interrupt monologue threads), or whenever
-        #    the previous tease appears resolved.
         if intent_kind != "monologue" and self._open_threads:
-            # Don't accumulate threads across mode switches — keep them small.
             self._open_threads = self._open_threads[-2:]
 
-        # 2) Heuristic: a thread is "opened" if the spoken segment ends on a
-        #    question OR contains a tease/setup phrase near the end.
         tail = spoken.strip()[-220:].strip()
         opened: list[str] = []
-        # Question at the end?
         last_sentence = re.split(r"[\.!?]\s+", tail)
         last_sentence = last_sentence[-1] if last_sentence else tail
         if "?" in tail[-80:]:
-            # Pull out the actual question.
             q_match = re.findall(r"([^\.!?]*\?)", tail)
             if q_match:
                 opened.append(q_match[-1].strip())
@@ -1166,16 +1158,12 @@ class Orchestrator:
         if len(self._open_threads) > 4:
             self._open_threads = self._open_threads[-4:]
 
-        # 3) If THIS segment was a monologue and it neither asked nor teased,
-        #    assume the prior open thread was paid off implicitly. Drop the
-        #    oldest open thread so we don't keep nagging forever.
         if intent_kind == "monologue" and not opened and self._open_threads:
             self._open_threads.pop(0)
 
     def _update_recent_themes(self, spoken: str) -> None:
         """Tag this segment with a short theme line so the next segment knows
         what's already been covered."""
-        # First sentence usually carries the theme; trim hard.
         first = re.split(r"[\.!?]\s+", spoken.strip())[0]
         words = first.split()
         if len(words) > 12:
@@ -1227,7 +1215,6 @@ class Orchestrator:
             new_notes = "".join(tokens).strip()
             if new_notes:
                 self._conv.compact_history(new_notes)
-                # Mirror into MemoryStore so notes persist across sessions.
                 if self._memory:
                     self._memory.update_notes(new_notes)
                 preview = new_notes[:160].replace("\n", " ⤷ ")
@@ -1248,22 +1235,15 @@ class Orchestrator:
 import re
 import struct
 
-# Stage directions (e.g. *sigh*, [laughs]) get spoken literally by TTS, which
-# shatters the illusion. Match conservatively so we don't eat legitimate text:
-#   * "*action*"   — italic, balanced, no stars in between
-#   * "[direction]" — square brackets, balanced
-# Parentheses NOT matched: they often carry legitimate asides.
+
 _STAGE_DIR = re.compile(
     r"\*[^*\n]{1,60}\*"
     r"|\[[^\]\n]{1,60}\]"
 )
-# Bold markdown like **word** — preserve the word, drop the markers.
 _BOLD = re.compile(r"\*\*([^*\n]{1,80})\*\*")
 # Leftover formatting characters that shouldn't be voiced.
 _MD_CHARS = re.compile(r"[\*_`#>]")
 
-# Emotion keyword patterns → expression slot name. Order matters — first match wins.
-# Tuned to catch the spoken-streamer vocabulary (English + a few common TR markers).
 _EMOTION_PATTERNS: list[tuple[re.Pattern, str]] = [
     # Laughter — strongest, fire first.
     (re.compile(r"\b(laugh|haha+|hehe+|lmao+|rofl|giggle|chuckle|cackle|kjjk|ahaha|yha|yhaha)\b", re.I), "laughing"),
@@ -1289,14 +1269,12 @@ _EMOTION_PATTERNS: list[tuple[re.Pattern, str]] = [
 
 
 def _scrub_unspeakable(text: str) -> str:
-    # Order matters: unwrap bold first (preserve word), then drop stage directions.
     text = _BOLD.sub(r"\1", text)
     text = _STAGE_DIR.sub("", text)
     text = _MD_CHARS.sub("", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
-# Words at which a long sentence can be cleanly broken into two.
 _BREAK_AFTER = {"and", "but", "which", "so", "because", "or", "though", "while", "until"}
 
 
@@ -1316,8 +1294,6 @@ def _split_run_on(sentence: str, max_words: int = 22) -> list[str]:
         prev_had_comma = i > 0 and words[i - 1].endswith(",")
         is_break_word = w.lower().rstrip(",.!?") in _BREAK_AFTER
         long_enough = len(cur) >= 12
-        # Strong break: ", and" / ", but" pattern.
-        # Soft break: any comma after >= 18 words.
         if long_enough and (
             (prev_had_comma and is_break_word) or (cur[-1].endswith(",") and len(cur) >= 18)
         ):
@@ -1332,7 +1308,6 @@ def _split_run_on(sentence: str, max_words: int = 22) -> list[str]:
             if not rest.endswith((".", "!", "?")):
                 rest += "."
             out.append(rest)
-    # Final guard: if splitting produced empty pieces, fall back to original.
     out = [p for p in out if p.strip()]
     return out or [sentence]
 
@@ -1370,7 +1345,6 @@ def _looks_non_pcm(chunk: bytes) -> bool:
         # MP3 sync word with valid layer bits — far more likely than the same
         # bytes appearing as legitimate PCM samples.
         return True
-    # JSON / HTML error page returned with status 200 by some providers.
     if head[:1] in (b"{", b"<"):
         return True
     return False
@@ -1386,7 +1360,6 @@ def _pcm_rms(pcm: bytes) -> float:
         rms = float(np.sqrt(np.mean(samples ** 2)))
         return min(1.0, rms / 32768.0)
     except Exception:
-        # Fallback without numpy: average of absolute sample values.
         n = len(pcm) // 2
         if n == 0:
             return 0.0

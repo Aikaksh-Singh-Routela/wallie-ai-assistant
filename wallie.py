@@ -1,8 +1,4 @@
-"""Entrypoint wiring: build every subsystem from the current config and hand off.
-
-This is the only place the graph of objects is assembled. Keeping the wiring in a
-single file makes it easy to reason about what exists at runtime.
-"""
+"""Entrypoint — builds all subsystems from config and starts the pipeline."""
 from __future__ import annotations
 
 import asyncio
