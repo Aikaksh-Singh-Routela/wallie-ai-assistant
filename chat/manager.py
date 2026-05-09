@@ -68,3 +68,16 @@ class ChatManager:
             return self.queue.get_nowait()
         except asyncio.QueueEmpty:
             return None
+
+    def drain(self, max_items: int = 0) -> list[ChatMessage]:
+        msgs: list[ChatMessage] = []
+        while max_items <= 0 or len(msgs) < max_items:
+            try:
+                msgs.append(self.queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        return msgs
+
+    @property
+    def pending_count(self) -> int:
+        return self.queue.qsize()

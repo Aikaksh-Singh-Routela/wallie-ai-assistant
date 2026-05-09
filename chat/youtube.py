@@ -64,40 +64,61 @@ class YouTubeChatMonitor(ChatMonitor):
             token_path.write_text(creds.to_json(), encoding="utf-8")
         self._service = build("youtube", "v3", credentials=creds, cache_discovery=False)
 
+    _HIGHLIGHT_TYPES = {
+        "superChatEvent", "superStickerEvent",
+        "newSponsorEvent", "memberMilestoneChatEvent",
+    }
+
     async def _run(self, out: asyncio.Queue[ChatMessage]) -> None:
         next_page: Optional[str] = None
         poll_interval = 2.0
+        warmed_up = False
         while not self._stop_event.is_set():
             try:
+                page_token = next_page
                 resp = await asyncio.to_thread(
-                    lambda: self._service.liveChatMessages()
+                    lambda pt=page_token: self._service.liveChatMessages()
                     .list(
                         liveChatId=self._live_chat_id,
                         part="id,snippet,authorDetails",
-                        pageToken=next_page,
+                        pageToken=pt,
                     )
                     .execute()
                 )
                 poll_interval = max(1.0, resp.get("pollingIntervalMillis", 2000) / 1000.0)
                 next_page = resp.get("nextPageToken")
+                if not warmed_up:
+                    warmed_up = True
+                    logger.debug(f"youtube: skipped {len(resp.get('items', []))} backlog messages")
+                    continue
                 for item in resp.get("items", []):
                     snip = item.get("snippet", {})
                     author = item.get("authorDetails", {})
                     text = snip.get("displayMessage") or snip.get("textMessageDetails", {}).get("messageText", "")
-                    is_super = snip.get("type", "").endswith("superChatEvent")
+                    msg_type = snip.get("type", "")
+                    is_highlight = msg_type in self._HIGHLIGHT_TYPES
                     if text:
-                        msg = ChatMessage(
-                            platform="youtube",
-                            username=author.get("displayName", "viewer"),
-                            text=text,
-                            is_highlight=bool(is_super),
-                        )
                         try:
-                            out.put_nowait(msg)
+                            out.put_nowait(ChatMessage(
+                                platform="youtube",
+                                username=author.get("displayName", "viewer"),
+                                text=text,
+                                is_highlight=is_highlight,
+                            ))
                         except asyncio.QueueFull:
                             pass
             except Exception as e:
-                logger.warning(f"youtube: poll error: {e}")
+                err_str = str(e).lower()
+                if "401" in err_str or "403" in err_str or "unauthorized" in err_str:
+                    logger.warning("youtube: auth expired, refreshing credentials")
+                    try:
+                        await asyncio.to_thread(self._build_service)
+                        warmed_up = False
+                        next_page = None
+                    except Exception as auth_err:
+                        logger.error(f"youtube: re-auth failed: {auth_err}")
+                else:
+                    logger.warning(f"youtube: poll error: {e}")
                 poll_interval = 5.0
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=poll_interval)

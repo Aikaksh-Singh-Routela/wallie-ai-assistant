@@ -33,6 +33,8 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
+import numpy as np
+
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -74,6 +76,7 @@ class VTubeStudioAvatar:
         # Lipsync envelope state.
         self._mouth_current: float = 0.0
         self._smile_current: float = 0.0
+        self._form_current: float = 0.5
 
         # Animation task handles.
         self._idle_task: Optional[asyncio.Task] = None
@@ -150,11 +153,15 @@ class VTubeStudioAvatar:
         """Hard cue at sentence start/end. Drives a small permanent smile while speaking."""
         self._speaking = speaking
         if not speaking:
-            # Decay the mouth fully closed and drop the speaking smile.
             self._mouth_current = 0.0
-            await self._inject(
-                {self._cfg.param_mouth_open: 0.0, self._cfg.param_mouth_smile: max(0.0, self._smile_current)}
-            )
+            self._form_current = 0.5
+            params = {
+                self._cfg.param_mouth_open: 0.0,
+                self._cfg.param_mouth_smile: max(0.0, self._smile_current),
+            }
+            if self._cfg.enable_viseme_lipsync:
+                params[self._cfg.param_mouth_form] = 0.5
+            await self._inject(params)
 
     async def set_volume(self, rms: float) -> None:
         """PCM RMS → MouthOpen with attack/release envelope and a noise floor."""
@@ -181,6 +188,73 @@ class VTubeStudioAvatar:
                 self._cfg.param_mouth_smile: round(self._smile_current, 3),
             }
         )
+
+    async def feed_audio(self, pcm: bytes, sample_rate: int = 24000) -> None:
+        """Drive lip sync from raw PCM: RMS for mouth open + spectral analysis for mouth shape."""
+        if not pcm or len(pcm) < 4:
+            return
+        samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+        rms = float(np.sqrt(np.mean(samples ** 2))) / 32768.0
+        rms = min(1.0, rms)
+
+        # Mouth open envelope (same logic as set_volume).
+        if rms < self._cfg.lipsync_floor:
+            target = 0.0
+        else:
+            target = min(1.0, rms * self._cfg.lipsync_gain) * self._cfg.lipsync_ceiling
+
+        if target > self._mouth_current:
+            self._mouth_current += (target - self._mouth_current) * self._cfg.lipsync_attack
+        else:
+            self._mouth_current += (target - self._mouth_current) * self._cfg.lipsync_release
+
+        # Smile envelope.
+        smile_target = self._cfg.speaking_smile if self._speaking else self._resting_smile
+        self._smile_current += (smile_target - self._smile_current) * 0.15
+
+        params: dict[str, float] = {
+            self._cfg.param_mouth_open: round(self._mouth_current, 3),
+            self._cfg.param_mouth_smile: round(self._smile_current, 3),
+        }
+
+        # Viseme: spectral shape → mouth form (wide vs round).
+        if self._cfg.enable_viseme_lipsync and rms > self._cfg.lipsync_floor:
+            form = self._estimate_mouth_form(samples / 32768.0, sample_rate)
+            smooth = self._cfg.viseme_smoothing
+            self._form_current += (form - self._form_current) * smooth
+            params[self._cfg.param_mouth_form] = round(self._form_current, 3)
+        elif self._cfg.enable_viseme_lipsync:
+            # Silence — relax mouth form toward neutral.
+            self._form_current += (0.5 - self._form_current) * 0.15
+            params[self._cfg.param_mouth_form] = round(self._form_current, 3)
+
+        await self._inject(params)
+
+    def _estimate_mouth_form(self, samples: np.ndarray, sr: int) -> float:
+        """Spectral band ratio → mouth form.
+        High-frequency dominance (front vowels A/E/I) → wide (1.0).
+        Low-frequency dominance (back vowels O/U) → round (0.0).
+        """
+        n = len(samples)
+        if n < 256:
+            return self._form_current
+
+        window = np.hanning(n)
+        spectrum = np.abs(np.fft.rfft(samples * window))
+        freqs = np.fft.rfftfreq(n, 1.0 / sr)
+
+        # Band energy: low (300-1200 Hz) vs high (1500-3500 Hz).
+        low_mask = (freqs >= 300) & (freqs <= 1200)
+        high_mask = (freqs >= 1500) & (freqs <= 3500)
+        low_energy = float(spectrum[low_mask].sum()) if low_mask.any() else 0.0
+        high_energy = float(spectrum[high_mask].sum()) if high_mask.any() else 0.0
+
+        total = low_energy + high_energy
+        if total < 1e-6:
+            return self._form_current
+
+        # Ratio: 0 = all low (round), 1 = all high (wide).
+        return high_energy / total
 
     async def set_smile(self, amount: float) -> None:
         """Manual smile control (for chat reactions etc.)."""

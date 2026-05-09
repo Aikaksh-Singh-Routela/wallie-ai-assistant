@@ -63,6 +63,7 @@ class Orchestrator:
         self._chat = chat_manager
         self._vision_loop = vision_loop
         self._vision_queue = vision_queue
+        self._vision_ready_at: float = 0.0
         self._avatar = avatar
         self._memory = memory_store
 
@@ -125,7 +126,19 @@ class Orchestrator:
         if self._chat:
             await self._chat.start()
         if self._vision_loop:
-            self._vision_loop.start()
+            delay = self._cfg.vision.startup_delay_sec
+            if delay > 0:
+                self._vision_ready_at = time.time() + delay
+                async def _delayed_vision_start() -> None:
+                    logger.info(f"orchestrator: vision starts in {delay:.0f}s — switch to your content now")
+                    await asyncio.sleep(delay)
+                    if self._running and self._vision_loop:
+                        self._vision_loop.start()
+                        logger.info("orchestrator: vision started")
+                    self._vision_ready_at = 0.0
+                asyncio.create_task(_delayed_vision_start(), name="vision-delay")
+            else:
+                self._vision_loop.start()
         self._main_task = asyncio.create_task(self._run(), name="orchestrator")
         d = self._cfg.orchestrator.session_duration_min
         if d > 0:
@@ -179,6 +192,7 @@ class Orchestrator:
             "user_behavior": self._behavior.current_pattern,
             "user_settled": self._behavior.is_settled,
             "browsing_pace": round(self._behavior.browsing_pace, 2),
+            "vision_countdown": round(max(0.0, self._vision_ready_at - time.time()), 1) if self._vision_ready_at > 0 else 0,
             "on_break": self._on_break,
             "next_break_in_sec": (
                 round(max(0.0, self._next_break_at - time.time()), 1)
@@ -594,12 +608,17 @@ class Orchestrator:
     def _pop_ordinary_chat(self) -> Optional[ChatMessage]:
         if not self._chat:
             return None
-        msg = self._chat.next_nowait()
-        if msg is None:
-            return None
         now = time.time()
         if now - self._last_chat_reply_ts < self._cfg.chat.min_reply_interval_sec:
             return None
+        max_age = self._cfg.chat.max_message_age_sec
+        while True:
+            msg = self._chat.next_nowait()
+            if msg is None:
+                return None
+            if now - msg.ts <= max_age:
+                break
+            logger.debug(f"chat: dropping stale message from {msg.username} ({now - msg.ts:.0f}s old)")
         if random.random() >= self._cfg.chat.reply_probability:
             return None
         return msg
@@ -898,7 +917,7 @@ class Orchestrator:
                         break
                 await self._player.write(pcm)
                 if self._avatar:
-                    await self._avatar_safe_call("set_volume", _pcm_rms(pcm))
+                    await self._avatar_safe_call("feed_audio", pcm, self._tts.sample_rate)
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -939,7 +958,7 @@ class Orchestrator:
                 piece = audio[i : i + CHUNK]
                 await self._player.write(piece)
                 if self._avatar:
-                    await self._avatar_safe_call("set_volume", _pcm_rms(piece))
+                    await self._avatar_safe_call("feed_audio", piece, self._tts.sample_rate)
         finally:
             self._player.boundary()
             await self._avatar_safe_call("set_speaking", False)

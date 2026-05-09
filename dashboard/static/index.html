@@ -415,6 +415,20 @@
         </div>
       </div>
 
+      <h3 class="subhead">Viseme lip sync</h3>
+      <div class="grid three toggles">
+        <label class="toggle-row">
+          <span>Spectral mouth shape</span>
+          <input type="checkbox" class="switch" x-model="cfg.avatar.enable_viseme_lipsync" />
+        </label>
+        <div class="field">
+          <label>Smoothing <span class="slider-val" x-text="cfg.avatar.viseme_smoothing.toFixed(2)"></span></label>
+          <input type="range" min="0.05" max="0.8" step="0.05" x-model.number="cfg.avatar.viseme_smoothing" />
+          <small class="hint">How fast mouth shape follows audio. Higher = snappier.</small>
+        </div>
+        <div></div>
+      </div>
+
       <h3 class="subhead">Idle motion</h3>
       <div class="grid three toggles">
         <label class="toggle-row">
@@ -559,6 +573,11 @@
           <input type="range" min="384" max="1280" step="32" x-model.number="cfg.vision.max_edge_px" />
           <small class="hint">Downscale before sending to the model. Smaller = faster + cheaper.</small>
         </div>
+        <div class="field">
+          <label>Startup delay <span class="slider-val" x-text="cfg.vision.startup_delay_sec.toFixed(0)+'s'"></span></label>
+          <input type="range" min="0" max="15" step="1" x-model.number="cfg.vision.startup_delay_sec" />
+          <small class="hint">Wait before capturing. Gives you time to switch to your content after hitting Start.</small>
+        </div>
       </div>
       <div x-show="cfg.vision.enabled">
         <label class="toggle-row">
@@ -617,6 +636,11 @@
         <div class="field">
           <label>Min interval between replies <span class="slider-val" x-text="cfg.chat.min_reply_interval_sec.toFixed(0)+'s'"></span></label>
           <input type="range" min="1" max="30" step="1" x-model.number="cfg.chat.min_reply_interval_sec" />
+        </div>
+        <div class="field">
+          <label>Max message age <span class="slider-val" x-text="cfg.chat.max_message_age_sec.toFixed(0)+'s'"></span></label>
+          <input type="range" min="10" max="120" step="5" x-model.number="cfg.chat.max_message_age_sec" />
+          <small class="hint">Messages older than this are discarded.</small>
         </div>
         <div class="field">
           <label>Address style</label>
@@ -683,6 +707,11 @@
             <input x-model="cfg.avatar.param_mouth_smile" placeholder="MouthSmile" />
             <small class="hint">Optional parameter for smile blending.</small>
           </div>
+          <div class="field">
+            <label>Mouth form parameter</label>
+            <input x-model="cfg.avatar.param_mouth_form" placeholder="ParamMouthForm" />
+            <small class="hint">Viseme shape (wide ↔ round). Leave default if unsure.</small>
+          </div>
         </div>
 
         <h3 class="subhead">Expression Hotkeys</h3>
@@ -724,15 +753,28 @@
           <label>Provider</label>
           <div class="segmented wide-seg">
             <template x-for="p in ['groq','openai','openrouter','anthropic','gemini','ollama']" :key="p">
-              <button :class="{on: cfg.llm.provider===p}" @click="cfg.llm.provider=p" x-text="p"></button>
+              <button :class="{on: cfg.llm.provider===p}" @click="cfg.llm.provider=p; onProviderChange()" x-text="p"></button>
             </template>
           </div>
         </div>
-        <div class="field">
-          <label>Model</label>
-          <input x-model="cfg.llm.model" placeholder="e.g. llama-3.3-70b-versatile" />
-          <small class="hint" x-text="suggestedModelHint()"></small>
-        </div>
+        <template x-if="cfg.llm.provider !== 'ollama'">
+          <div class="field">
+            <label>Model</label>
+            <select x-model="cfg.llm.model" @change="onModelSelect()">
+              <option value="" disabled>-- select model --</option>
+              <template x-for="m in modelOptions()" :key="m.id">
+                <option :value="m.id" x-text="m.label + (m.vision ? ' \u00b7 vision' : '') + (m.custom ? ' (custom)' : '')"></option>
+              </template>
+            </select>
+          </div>
+        </template>
+        <template x-if="cfg.llm.provider === 'ollama'">
+          <div class="field">
+            <label>Model</label>
+            <input x-model="cfg.llm.model" placeholder="e.g. llama3.2" />
+            <small class="hint">Enter the model name as shown in <code>ollama list</code></small>
+          </div>
+        </template>
         <div class="field">
           <label>Temperature <span class="slider-val" x-text="cfg.llm.temperature.toFixed(2)"></span></label>
           <input type="range" min="0" max="1.5" step="0.05" x-model.number="cfg.llm.temperature" />
@@ -906,6 +948,10 @@
       <div class="stat"><label>Memory</label><div x-text="(status.session_notes_chars || 0) + ' chars'"></div></div>
       <div class="stat"><label>Audio queue</label><div x-text="(status.audio_queue_sec || 0).toFixed(1) + 's'"></div></div>
       <div class="stat"><label>TTS</label><div class="one-line" x-text="status.tts || '—'"></div></div>
+    </div>
+
+    <div class="panel-sub" x-show="status.vision_countdown > 0">
+      <div class="panel-title" style="color: var(--warn)">Vision starting in <span x-text="Math.ceil(status.vision_countdown)"></span>s — switch to your content</div>
     </div>
 
     <div class="panel-sub" x-show="status.user_behavior">

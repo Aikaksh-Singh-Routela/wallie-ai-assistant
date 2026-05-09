@@ -175,8 +175,9 @@ class UserBehaviorTracker:
             )
         if self.is_watching_media:
             return (
-                "You're watching something. React to what's happening in the "
-                "video/stream, not to the player UI."
+                "Active content on YOUR screen. React to what's happening — "
+                "you're the one doing this, not watching someone else. "
+                "Use 'I', not 'the player' or 'the character'."
             )
         if self.is_settled:
             settled = self.settled_seconds

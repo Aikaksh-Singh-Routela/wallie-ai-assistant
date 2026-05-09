@@ -46,7 +46,8 @@ class KickChatMonitor(ChatMonitor):
         while not self._stop_event.is_set():
             chatroom_id: Optional[int] = None
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"}
+                async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
                     resp = await client.get(_CHANNEL_API.format(slug=self._channel))
                     resp.raise_for_status()
                     data = resp.json()
@@ -88,19 +89,30 @@ class KickChatMonitor(ChatMonitor):
                     pass
 
 
+_KICK_HIGHLIGHT_EVENTS = {
+    "App\\Events\\SubscriptionEvent",
+    "App\\Events\\GiftedSubscriptionsEvent",
+}
+
+
 def _parse_kick_event(raw: str) -> Optional[ChatMessage]:
     try:
         envelope = json.loads(raw)
     except json.JSONDecodeError:
         return None
-    if envelope.get("event") != "App\\Events\\ChatMessageEvent":
-        return None
+    event = envelope.get("event", "")
     try:
         data = json.loads(envelope.get("data", "{}"))
     except json.JSONDecodeError:
         return None
-    user = data.get("sender", {}).get("username") or "viewer"
-    text = data.get("content") or ""
-    if not text:
-        return None
-    return ChatMessage(platform="kick", username=user, text=text)
+    if event == "App\\Events\\ChatMessageEvent":
+        user = data.get("sender", {}).get("username") or "viewer"
+        text = data.get("content") or ""
+        if not text:
+            return None
+        return ChatMessage(platform="kick", username=user, text=text)
+    if event in _KICK_HIGHLIGHT_EVENTS:
+        user = data.get("username") or data.get("gifter_username") or "viewer"
+        text = data.get("message") or f"{user} just subscribed!"
+        return ChatMessage(platform="kick", username=user, text=text, is_highlight=True)
+    return None

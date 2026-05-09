@@ -24,13 +24,43 @@ const EMOTION_SLOTS = [
   "thinking", "smug", "eyeroll", "confused", "hype", "deadpan",
 ];
 
-const MODEL_HINTS = {
-  groq: "llama-3.3-70b-versatile · openai/gpt-oss-120b · meta-llama/llama-4-scout-17b-16e-instruct (vision, fast/cheap, weaker recognition) · meta-llama/llama-4-maverick-17b-128e-instruct (vision, better recognition)",
-  openai: "gpt-4o · gpt-4o-mini · gpt-4.1 — strongest visual recognition (characters, IPs, brands)",
-  openrouter: "anthropic/claude-sonnet-4-5 (best vision recognition) · openai/gpt-4o · google/gemini-2.5-pro",
-  anthropic: "claude-sonnet-4-5 · claude-opus-4-1 · claude-haiku-4-5 — top-tier vision recognition for characters/IPs",
-  gemini: "gemini-2.5-pro · gemini-2.5-flash — strong vision, free tier available",
-  ollama: "llama3.2 · llama3.2-vision (vision) · qwen2.5 · mistral · gemma3 — runs fully locally, no API key needed",
+const MODEL_OPTIONS = {
+  groq: [
+    { id: "meta-llama/llama-4-maverick-17b-128e-instruct", label: "Llama 4 Maverick 17B", vision: true },
+    { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B", vision: true },
+    { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", vision: false },
+    { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B (fast)", vision: false },
+    { id: "gemma2-9b-it", label: "Gemma 2 9B", vision: false },
+    { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B", vision: false },
+  ],
+  openai: [
+    { id: "gpt-4.1", label: "GPT-4.1", vision: true },
+    { id: "gpt-4.1-mini", label: "GPT-4.1 Mini", vision: true },
+    { id: "gpt-4.1-nano", label: "GPT-4.1 Nano", vision: true },
+    { id: "gpt-4o", label: "GPT-4o", vision: true },
+    { id: "gpt-4o-mini", label: "GPT-4o Mini", vision: true },
+    { id: "o3-mini", label: "o3 Mini", vision: false },
+  ],
+  openrouter: [
+    { id: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5", vision: true },
+    { id: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5", vision: true },
+    { id: "openai/gpt-4o", label: "GPT-4o", vision: true },
+    { id: "openai/gpt-4.1", label: "GPT-4.1", vision: true },
+    { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", vision: true },
+    { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", vision: true },
+    { id: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", vision: false },
+  ],
+  anthropic: [
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", vision: true },
+    { id: "claude-opus-4-1", label: "Claude Opus 4.1", vision: true },
+    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", vision: true },
+  ],
+  gemini: [
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", vision: true },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", vision: true },
+    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", vision: true },
+  ],
+  ollama: [],
 };
 
 function emptyCfg() {
@@ -50,8 +80,8 @@ function emptyCfg() {
     },
     llm: { provider: "groq", model: "", temperature: 0.85, top_p: 0.95, max_tokens: 500, presence_penalty: 0.3, frequency_penalty: 0.4, vision_capable: false, ollama_base_url: "http://localhost:11434", ollama_keep_alive: "5m" },
     tts: { provider: "fish", voice_id: "", sample_rate: 24000, el_model_id: "eleven_turbo_v2_5", el_stability: 0.45, el_similarity_boost: 0.75, el_style: 0.0, fish_latency_mode: "balanced" },
-    vision: { enabled: false, source: "monitor", monitor_index: 1, interval_sec: 3.0, min_change_threshold: 8, max_edge_px: 768 },
-    chat: { youtube_enabled: false, twitch_enabled: false, kick_enabled: false, reply_probability: 0.35, min_reply_interval_sec: 8.0 },
+    vision: { enabled: false, source: "monitor", monitor_index: 1, interval_sec: 3.0, min_change_threshold: 8, max_edge_px: 768, startup_delay_sec: 5 },
+    chat: { youtube_enabled: false, twitch_enabled: false, kick_enabled: false, reply_probability: 0.35, min_reply_interval_sec: 8.0, max_message_age_sec: 45.0 },
     topics: { mode: "ai_picks", topics: [], switch_min_sec: 90, switch_chance: 0.15 },
     orchestrator: {
       segment_target_sec: 12,
@@ -83,6 +113,9 @@ function emptyCfg() {
       lipsync_attack: 0.65,
       lipsync_release: 0.30,
       speaking_smile: 0.15,
+      param_mouth_form: "ParamMouthForm",
+      enable_viseme_lipsync: true,
+      viseme_smoothing: 0.35,
       enable_idle_motion: true,
       idle_sway_amplitude: 4.0,
       idle_sway_period_sec: 6.0,
@@ -488,8 +521,28 @@ function app() {
       else list.push(value);
     },
 
-    suggestedModelHint() {
-      return MODEL_HINTS[this.cfg.llm.provider] || "";
+    modelOptions() {
+      const provider = this.cfg.llm.provider;
+      if (provider === "ollama") return [];
+      const models = (MODEL_OPTIONS[provider] || []).slice();
+      if (this.cfg.llm.model && !models.some(m => m.id === this.cfg.llm.model)) {
+        models.unshift({ id: this.cfg.llm.model, label: this.cfg.llm.model, vision: this.cfg.llm.vision_capable, custom: true });
+      }
+      return models;
+    },
+
+    onModelSelect() {
+      const models = MODEL_OPTIONS[this.cfg.llm.provider] || [];
+      const selected = models.find(m => m.id === this.cfg.llm.model);
+      if (selected) this.cfg.llm.vision_capable = selected.vision;
+    },
+
+    onProviderChange() {
+      const models = MODEL_OPTIONS[this.cfg.llm.provider] || [];
+      if (models.length > 0 && !models.some(m => m.id === this.cfg.llm.model)) {
+        this.cfg.llm.model = models[0].id;
+        this.cfg.llm.vision_capable = models[0].vision;
+      }
     },
 
     formatHMS,

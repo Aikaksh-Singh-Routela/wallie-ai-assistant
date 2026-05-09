@@ -59,18 +59,23 @@ class TwitchChatMonitor(ChatMonitor):
                             if line.startswith("PING"):
                                 await ws.send(line.replace("PING", "PONG", 1))
                                 continue
-                            msg = _parse_privmsg(line)
-                            if msg:
-                                user, text, is_bits = msg
+                            parsed = _parse_privmsg(line)
+                            if parsed:
+                                user, text, is_bits = parsed
                                 try:
-                                    out.put_nowait(
-                                        ChatMessage(
-                                            platform="twitch",
-                                            username=user,
-                                            text=text,
-                                            is_highlight=is_bits,
-                                        )
-                                    )
+                                    out.put_nowait(ChatMessage(
+                                        platform="twitch",
+                                        username=user,
+                                        text=text,
+                                        is_highlight=is_bits,
+                                    ))
+                                except asyncio.QueueFull:
+                                    pass
+                                continue
+                            notice = _parse_usernotice(line)
+                            if notice:
+                                try:
+                                    out.put_nowait(notice)
                                 except asyncio.QueueFull:
                                     pass
             except Exception as e:
@@ -79,6 +84,17 @@ class TwitchChatMonitor(ChatMonitor):
                     await asyncio.wait_for(self._stop_event.wait(), timeout=5.0)
                 except asyncio.TimeoutError:
                     pass
+
+
+_HIGHLIGHT_NOTICE_IDS = {"sub", "resub", "subgift", "submysterygift", "raid"}
+
+
+def _parse_tags(raw: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for kv in raw.lstrip("@").split(";"):
+        k, _, v = kv.partition("=")
+        out[k] = v
+    return out
 
 
 def _parse_privmsg(line: str) -> Optional[tuple[str, str, bool]]:
@@ -98,5 +114,31 @@ def _parse_privmsg(line: str) -> Optional[tuple[str, str, bool]]:
                 if kv.startswith("bits=") and kv[5:] not in {"", "0"}:
                     is_bits = True
         return nick, text.strip(), is_bits
+    except Exception:
+        return None
+
+
+def _parse_usernotice(line: str) -> Optional[ChatMessage]:
+    if "USERNOTICE" not in line:
+        return None
+    tags_raw = ""
+    rest = line
+    if line.startswith("@"):
+        tags_raw, _, rest = rest.partition(" ")
+    if "USERNOTICE" not in rest:
+        return None
+    try:
+        tags = _parse_tags(tags_raw)
+        msg_id = tags.get("msg-id", "")
+        if msg_id not in _HIGHLIGHT_NOTICE_IDS:
+            return None
+        nick = tags.get("display-name") or tags.get("login", "viewer")
+        sys_msg = tags.get("system-msg", "").replace("\\s", " ")
+        _, _, trailing = rest.partition(" :")
+        user_text = trailing.strip() if " :" in rest else ""
+        text = user_text if user_text else sys_msg
+        if not text:
+            text = f"{nick} just subscribed!"
+        return ChatMessage(platform="twitch", username=nick, text=text, is_highlight=True)
     except Exception:
         return None

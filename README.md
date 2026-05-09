@@ -47,7 +47,7 @@ They work for a 2-minute demo and fall apart on a real stream. Here's what actua
 |---|---|---|
 | **Repetition** | Says "that's interesting" every 30 seconds | Dedupe engine + phrase cooldown + rolling summary that tracks everything already said |
 | **Short memory** | Forgets the topic from 5 minutes ago | Rolling summarizer compresses old turns into bullet notes, injected into every prompt |
-| **Robotic vision** | "I can see a YouTube homepage with several videos" | SKIP escape hatch — if nothing specific is worth naming, the AI stays quiet |
+| **Robotic vision** | "I can see a YouTube homepage with several videos" | First-person ownership + SKIP escape hatch — narrates nothing, reacts to what matters |
 | **Question loops** | Every segment ends with "what do you think, chat?" | Question detector throttles after one; next prompt forces a statement ending |
 | **No personality** | Generic helpful assistant voice | Full persona system: energy, humor style, catchphrases, backstory, opinions, taboo topics |
 | **Choppy pacing** | 2 sentences → long pause → 2 sentences | Pipeline overlap + longer thought development eliminates dead air |
@@ -109,16 +109,17 @@ Real streamers don't talk at a constant rate. They get excited, they pause to th
 
 Screen reactions are the hardest part to get right. Wallie's approach:
 
-- **First-person framing** — "my game", "the tab I just pulled up", not "I can see a screen with..."
+- **First-person ownership** — Wallie owns whatever is on screen. Gaming: "I just got bodied by that boss", not "the character is fighting a boss". Browsing: "let me pull this up", not "the user is browsing". Never third-person, never narration.
 - **SKIP escape hatch** — if there's nothing specific to name, the model outputs `SKIP` and stays quiet. No more narrating generic UIs.
-- **Activity adaptation** — detects scrolling, typing, app-switching, video playback and adjusts reactions accordingly. Typing → ignore. App switch → react. Rapid browsing → wait until user settles.
-- **Scene memory** — remembers what it last said about the current screen. Won't repeat "oh, Elden Ring" every 3 seconds.
+- **Activity adaptation** — detects scrolling, typing, app-switching, video playback and adjusts reactions accordingly. Typing → ignore. App switch → react. Rapid browsing → wait until user settles. Each activity type gets context-aware prompting.
+- **Attention engine** — not every screen change gets the same treatment. DEEP reactions (22%), quick GLANCEs (28%), personal TANGENTs (5%), deliberate IGNOREs (27%), and SILENCE beats (18%). Streak fatigue prevents reacting the same way twice in a row.
+- **Scene memory** — remembers what it last said about the current screen. Dedupe threshold at 0.65 with per-sentence comparison catches paraphrased repetition.
 
 ### Live2D avatar with emotion
 
-Not just a mouth that opens and closes. Five animation layers run simultaneously over a single WebSocket, so the avatar feels like a person — not a puppet.
+Not just a mouth that opens and closes. Six animation layers run simultaneously over a single WebSocket, so the avatar feels like a person — not a puppet.
 
-- **PCM lipsync** — real-time amplitude tracking with asymmetric attack/release envelope, noise floor gating, and a speaking smile baseline
+- **Viseme lip sync** — spectral analysis of PCM audio estimates mouth shape in real-time. Front vowels (A/E/I) spread the mouth wide, back vowels (O/U) round it. Combined with RMS amplitude for jaw openness, attack/release envelope, noise floor gating, and a speaking smile baseline. The result: the avatar's mouth actually forms different shapes per sound, not just open/close.
 - **Blink** — periodic natural eye blinks (~3.8s interval) with random variation and occasional double-blinks. Blink rate adapts to mood: sleepy = more blinks, alert = fewer
 - **Body motion** — slow torso sway on BodyAngleX/Y/Z, lower amplitude and longer period than head movement, so the avatar breathes even when silent
 - **Idle motion** — head sway and eye darts when not speaking. Eye-dart frequency increases when the streamer's mood focus drops (scattered attention)
@@ -231,7 +232,7 @@ The SKIP escape hatch is always active — no configuration needed.
 2. In the dashboard: Avatar → toggle ON
 3. First connect triggers a plugin approval popup in VTS — click Allow
 4. Expression slots are **auto-mapped** from your model's hotkeys on connect. Override manually if needed
-5. Adjust lipsync gain/ceiling for your voice
+5. Adjust lipsync gain/ceiling for your voice. Viseme lip sync (spectral mouth shape) is enabled by default — disable it in Avatar config if your model doesn't have a `ParamMouthForm` parameter
 6. Blink, body motion, and mood-reactive behaviour are enabled by default — tweak or disable per-feature in config
 
 Works with any Live2D model that has standard parameters (`MouthOpen`, `EyeOpenLeft/Right`, `FaceAngleX/Y/Z`, `BodyAngleX/Y/Z`).
@@ -272,7 +273,7 @@ Wallie outputs audio through your system's default audio device. To route it int
                          │
                          │  PCM16 audio
                          ▼
-                    AudioPlayer ──────► VTube Studio (lipsync + blink + body + expressions)
+                    AudioPlayer ──────► VTube Studio (viseme lipsync + blink + body + expressions)
                          │                    ▲
                          │              Mood Engine (arousal/valence/focus)
                          │
@@ -301,7 +302,8 @@ wallie-v2/
 │   ├── persona.py         # prompt engineering
 │   ├── context.py         # conversation history + rolling summary
 │   ├── attention.py       # vision reaction decisions
-│   └── mood.py            # slow-evolving emotional state
+│   ├── mood.py            # slow-evolving emotional state
+│   └── memory_store.py    # cross-session persistent memory
 ├── llm/                   # 5 LLM provider adapters
 ├── tts/                   # 3 TTS provider adapters
 ├── audio/                 # sounddevice player with alignment safety
@@ -377,6 +379,12 @@ Check that the `MouthOpen` parameter name matches your model (some use `ParamMou
 </details>
 
 <details>
+<summary><strong>Avatar mouth moves but shape looks wrong</strong></summary>
+
+Viseme lip sync drives `ParamMouthForm` for mouth shape (wide ↔ round). If your model uses a different parameter name, update it in Avatar → Parameters → Mouth form. If your model doesn't support mouth form at all, disable "Spectral mouth shape" in the Viseme section — lipsync will fall back to volume-only (open/close).
+</details>
+
+<details>
 <summary><strong>Avatar doesn't blink</strong></summary>
 
 Check that your model has `EyeOpenLeft` / `EyeOpenRight` parameters (some use `ParamEyeLOpen` / `ParamEyeROpen`). Override the parameter names in Avatar config. Blink can be disabled with `enable_blink: false`.
@@ -400,6 +408,7 @@ Verify the key in API Keys — the masked preview should match your provider das
 
 What's coming next:
 
+- **Hearing** — real-time audio input so Wallie can listen and react to game audio, music, voice chat, and stream alerts. Not just eyes — ears too.
 - **Streaming avatar backend (HeyGen)** — realistic-looking avatars as an alternative to Live2D
 - **First-run wizard** — guided setup that walks you through provider choice → key entry → first stream
 - **Docker image** — `docker run wallie` with a volume for config

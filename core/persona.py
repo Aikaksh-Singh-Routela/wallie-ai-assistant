@@ -265,9 +265,12 @@ class Persona:
                 "- 'The scene changed to a different room' (narrating transitions)",
             ]
             if p.vision_first_person:
-                vision_block.append(
-                    "First-person: 'my screen', 'I pulled this up'. Never 'I can see' or 'on the screen'."
-                )
+                vision_block += [
+                    "First-person: YOU own everything on screen. You're the one doing it.",
+                    "Gaming: 'I just got bodied', 'let me try this again', 'oh I'm cooked'.",
+                    "Browsing: 'let me pull this up', 'I was looking at this'.",
+                    "NEVER: 'the player', 'the character', 'the user', 'I can see', 'on the screen'.",
+                ]
             vision_block += [
                 "Do not invent UI elements or text you can't see.",
             ]
@@ -529,6 +532,17 @@ class Persona:
         mood_hint = f" Mood: {mood_label}." if mood_label else ""
         VOICE = f"\n\nVoice: {p.name}, {p.energy}, natural and conversational. Not robotic. Full thoughts.{mood_hint}"
 
+        # First-person ownership: you ARE the one doing what's on screen
+        OWNERSHIP = ""
+        if screen_activity in ("media", "app_switch"):
+            OWNERSHIP = (
+                "\n\nYOU are doing this. Not 'the character' or 'the player' — YOU. "
+                "Say 'I' not 'they'. 'I just died', 'let me try again', 'oh I'm so dead'. "
+                "React like YOU are in control."
+            )
+        if adaptation_hint:
+            OWNERSHIP += f"\n{adaptation_hint}"
+
         if change_type == "glance":
             tone_map = {
                 "amused":  "amused",
@@ -547,7 +561,7 @@ class Persona:
                 "No generic commentary ('westerns are tense'). No filler ('it's iconic'). "
                 "If you can't say something specific and interesting: SKIP"
                 f"{no_repeat}"
-                + SCREEN_ANCHOR + VOICE
+                + SCREEN_ANCHOR + VOICE + OWNERSHIP
             )
 
         if change_type == "tangent":
@@ -564,7 +578,7 @@ class Persona:
                 "a hot take, a funny thought, a memory. Don't describe the screen, "
                 "just let it trigger your reaction."
                 f"{seed_line}{no_repeat_t}"
-                + SCREEN_ANCHOR + VOICE
+                + SCREEN_ANCHOR + VOICE + OWNERSHIP
             )
 
         if change_type == "enrich":
@@ -591,7 +605,7 @@ class Persona:
                 "What specifically caught your eye? Your take on THAT thing. "
                 "If nothing meaningful changed: SKIP"
                 f"{context}"
-                + SCREEN_ANCHOR + VOICE
+                + SCREEN_ANCHOR + VOICE + OWNERSHIP
             )
 
         bridge = ""
@@ -613,7 +627,7 @@ class Persona:
             "Every sentence must say something specific. No filler, no padding. "
             "If you can't say something specific: SKIP."
             f"{bridge}"
-            + SCREEN_ANCHOR + VOICE
+            + SCREEN_ANCHOR + VOICE + OWNERSHIP
         )
 
     def outro_turn(self, *, minutes_streamed: float) -> str:

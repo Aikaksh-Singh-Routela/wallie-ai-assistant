@@ -152,6 +152,7 @@ class VisionConfig(BaseModel):
     micro_change_threshold: int = 4
     idle_check_interval_sec: float = 45.0
     min_engagement_for_react: float = 0.35
+    startup_delay_sec: float = 5.0
 
 
 class ChatConfig(BaseModel):
@@ -160,6 +161,7 @@ class ChatConfig(BaseModel):
     kick_enabled: bool = False
     reply_probability: float = 0.35
     min_reply_interval_sec: float = 8.0
+    max_message_age_sec: float = 45.0
 
 
 class TopicConfig(BaseModel):
@@ -215,6 +217,7 @@ class AvatarConfig(BaseModel):
 
     param_mouth_open:  str = "MouthOpen"
     param_mouth_smile: str = "MouthSmile"
+    param_mouth_form:  str = "ParamMouthForm"
     param_face_x:      str = "FaceAngleX"
     param_face_y:      str = "FaceAngleY"
     param_face_z:      str = "FaceAngleZ"
@@ -228,6 +231,9 @@ class AvatarConfig(BaseModel):
     lipsync_attack:  float = 0.65
     lipsync_release: float = 0.30
     speaking_smile:  float = 0.15
+
+    enable_viseme_lipsync: bool = True
+    viseme_smoothing:      float = 0.35
 
     enable_idle_motion: bool = True
     idle_sway_amplitude: float = 4.0

@@ -19,3 +19,10 @@ profiles/*.memory.json
 .vs/
 *.swp
 *.swo
+
+# Demo/trailer assets (not part of the project)
+wallie-trailer-remotion/
+trailer/
+claude-design-bundle/
+claude-design-v2/
+.claude/
