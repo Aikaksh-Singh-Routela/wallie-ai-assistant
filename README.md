@@ -152,6 +152,12 @@ Everything is configured from the browser. No YAML files. No terminal commands a
 
 Three columns: navigation, section editor, live status. Test any configuration change instantly with the preview buttons before going live.
 
+<p align="center">
+  <img src="docs/images/dashboard-identity.png" alt="Dashboard — Identity" width="100%" />
+  <br /><br />
+  <img src="docs/images/dashboard-personality.png" alt="Dashboard — Personality" width="100%" />
+</p>
+
 ---
 
 ## Quick start
