@@ -2,6 +2,7 @@
   <h1 align="center">Wallie</h1>
   <p align="center"><strong>The open-source AI streamer that actually feels alive.</strong></p>
   <p align="center">
+    <a href="https://spontaneous-dodol-cabb7d.netlify.app/">Website</a> &nbsp;·&nbsp;
     <a href="#quick-start">Quick Start</a> &nbsp;·&nbsp;
     <a href="#features">Features</a> &nbsp;·&nbsp;
     <a href="#the-dashboard">Dashboard</a> &nbsp;·&nbsp;
