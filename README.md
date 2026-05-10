@@ -2,6 +2,7 @@
   <h1 align="center">Wallie</h1>
   <p align="center"><strong>The open-source AI streamer that actually feels alive.</strong></p>
   <p align="center">
+    <a href="https://spontaneous-dodol-cabb7d.netlify.app/">Website</a> &nbsp;·&nbsp;
     <a href="#quick-start">Quick Start</a> &nbsp;·&nbsp;
     <a href="#features">Features</a> &nbsp;·&nbsp;
     <a href="#the-dashboard">Dashboard</a> &nbsp;·&nbsp;
@@ -62,7 +63,7 @@ These aren't edge cases. They're the default behavior of most AI streamer projec
 
 ### Bring your own everything
 
-Five LLM providers. Three TTS engines. Three chat platforms. Mix and match per profile.
+Six LLM providers. Three TTS engines. Three chat platforms. Mix and match per profile.
 
 | LLM | TTS | Chat | Avatar |
 |---|---|---|---|
@@ -71,8 +72,9 @@ Five LLM providers. Three TTS engines. Three chat platforms. Mix and match per p
 | Google (Gemini) | Piper (local, free) | Kick | — |
 | Groq | — | — | — |
 | OpenRouter | — | — | — |
+| Ollama (local, free) | — | — | — |
 
-Swap providers without changing code. Run a $0 stream with Gemini + Piper, or go premium with Claude + ElevenLabs.
+Swap providers without changing code. Run a fully offline stream with Ollama + Piper, or go premium with Claude + ElevenLabs.
 
 ### Full persona design
 
@@ -334,6 +336,7 @@ wallie-v2/
 | **OpenRouter** | ✅ | ✅ (varies) | One key, many models. |
 | **Anthropic** | ✅ | ✅ (Claude 4) | Best character/IP recognition. |
 | **Gemini** | ✅ | ✅ (2.5 family) | Free tier (50 req/min). |
+| **Ollama** | ✅ | ✅ (llava, etc.) | Fully local. No API key. |
 
 ### TTS
 
@@ -418,7 +421,6 @@ What's coming next:
 - **Streaming avatar backend (HeyGen)** — realistic-looking avatars as an alternative to Live2D
 - **First-run wizard** — guided setup that walks you through provider choice → key entry → first stream
 - **Docker image** — `docker run wallie` with a volume for config
-- **Local LLM support** — Ollama / llama.cpp for fully offline streams
 - **Cost meter** — running spend tally in the live drawer
 - **OBS WebSocket integration** — scene switching tied to stream events
 - **Voice cloning UI** — upload reference audio, create a voice from the dashboard
