@@ -170,7 +170,7 @@ class PinBody(BaseModel):
 
 def _build_app(
     state: DashboardState,
-    initial: Orchestrator,
+    initial: Optional[Orchestrator],
     *,
     pin: str = "",
 ) -> FastAPI:
@@ -640,7 +640,7 @@ def _build_app(
     return app
 
 
-async def serve(orchestrator: Orchestrator) -> None:
+async def serve(orchestrator: Optional[Orchestrator]) -> None:
     state = DashboardState()
 
     host = os.getenv("DASHBOARD_HOST", "0.0.0.0")

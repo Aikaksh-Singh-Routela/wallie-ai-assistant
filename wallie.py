@@ -97,8 +97,7 @@ async def run_cli() -> None:
 async def run_with_dashboard() -> None:
     from dashboard.server import serve
 
-    orch = build_orchestrator()
-    await serve(orch)
+    await serve(None)
 
 
 def main() -> None:
