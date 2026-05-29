@@ -29,14 +29,20 @@ class AnthropicProvider(LLMProvider):
         frequency_penalty: float = 0.0,  # same
     ) -> AsyncIterator[str]:
         system_prompt, rest = self._split_system(messages)
+        # Cache the system prompt — it's large (~900 lines) and constant per session.
+        # After the first call, Anthropic serves it from cache: ~90% faster input processing.
+        system_block = [
+            {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+        ]
         try:
             async with self._client.messages.stream(
                 model=self.model,
-                system=system_prompt,
+                system=system_block,
                 messages=[self._encode_message(m) for m in rest],
                 max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=top_p,
+                extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
             ) as stream:
                 async for text in stream.text_stream:
                     if text:
