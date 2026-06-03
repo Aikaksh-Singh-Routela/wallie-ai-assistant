@@ -1,4 +1,4 @@
-
+[![Featured on Product Hunt](https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1158674&theme=light)](https://www.producthunt.com/products/wallie-v2)
 
 https://github.com/user-attachments/assets/bb4404e5-9138-4288-a428-345486b86f7e
 
