@@ -321,8 +321,13 @@ class AttentionEngine:
         elif chosen == VisionReaction.SILENCE:
             self._state.silence_pressure = max(0.0, self._state.silence_pressure - 0.4)
         else:
+            # NOTE: the streak (vision_reactions_in_a_row) is intentionally NOT bumped
+            # here. It is owned solely by on_segment_spoken(), which fires only when the
+            # reaction actually produced speech — a decision that ends in SKIP must not
+            # count as a reaction. Bumping it here too made the streak climb twice per
+            # spoken reaction, so fatigue kicked in after 1 reaction instead of the
+            # intended 2+.
             self._state.last_vision_reaction_ts = now
-            self._state.vision_reactions_in_a_row += 1
             self._state.ignored_scenes_in_a_row = 0
             if chosen == VisionReaction.TANGENT:
                 self._state.tangent_pressure = max(0.0, self._state.tangent_pressure - 0.3)

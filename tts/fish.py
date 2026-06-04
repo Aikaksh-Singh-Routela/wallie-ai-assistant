@@ -18,6 +18,7 @@ class FishTTS(TTSProvider):
         voice_id: str,
         sample_rate: int = 24000,
         latency_mode: str = "balanced",  # "normal" | "balanced"
+        chunk_length: int = 100,
     ) -> None:
         if not api_key:
             raise TTSError("fish: missing FISH_API_KEY")
@@ -27,6 +28,7 @@ class FishTTS(TTSProvider):
         self._api_key = api_key
         self._voice_id = voice_id
         self._latency = latency_mode
+        self._chunk_length = max(100, min(300, chunk_length))
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=5.0))
 
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
@@ -36,7 +38,7 @@ class FishTTS(TTSProvider):
             "text": text,
             "format": "pcm",
             "sample_rate": self.sample_rate,
-            "chunk_length": 200,
+            "chunk_length": self._chunk_length,
             "latency": self._latency,
         }
         if self._voice_id:

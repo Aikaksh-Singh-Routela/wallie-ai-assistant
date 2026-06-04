@@ -128,6 +128,9 @@ class TTSConfig(BaseModel):
     el_similarity_boost: float = 0.75
     el_style: float = 0.0
     fish_latency_mode: Literal["normal", "balanced"] = "balanced"
+    # Server-side text buffer before audio generation. Lower = faster time-to-first-audio
+    # (snappier reactions), higher = smoother prosody. Range 100-300; 100 favors latency.
+    fish_chunk_length: int = 100
     piper_model_path: str = ""
     piper_length_scale: float = 1.0
 

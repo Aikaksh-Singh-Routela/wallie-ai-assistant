@@ -24,6 +24,7 @@ def build_tts(cfg: TTSConfig, secrets: Secrets) -> TTSProvider:
             voice_id=cfg.voice_id,
             sample_rate=cfg.sample_rate,
             latency_mode=cfg.fish_latency_mode,
+            chunk_length=cfg.fish_chunk_length,
         )
 
     if cfg.provider == "elevenlabs":

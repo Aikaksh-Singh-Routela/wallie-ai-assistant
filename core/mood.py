@@ -205,7 +205,11 @@ class MoodEngine:
 
     def _retag(self) -> None:
         a, v, f = self._state.arousal, self._state.valence, self._state.focus
-        if a >= 0.80 and v >= 0.10:
+        if a >= 0.78 and v <= -0.12:
+            self._state.mood_label = "tilted"
+        elif a >= 0.75 and f >= 0.80:
+            self._state.mood_label = "locked in"
+        elif a >= 0.80 and v >= 0.10:
             self._state.mood_label = "wired"
         elif a >= 0.70 and v >= 0.25:
             self._state.mood_label = "hyped"

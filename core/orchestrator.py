@@ -701,7 +701,7 @@ class Orchestrator:
         if intent.kind == "vision":
             await self._ensure_fresh_screen_frame()
 
-        user_msg, images, source_tag = self._build_user_turn(intent)
+        user_msg, images, source_tag = await self._build_user_turn(intent)
         if user_msg:
             self._conv.add_user(user_msg, source=source_tag, images=images)
         if intent.kind == "chat" and intent.chat is not None:
@@ -1012,16 +1012,26 @@ class Orchestrator:
             logger.debug(f"avatar.{method} failed: {e}")
 
     # ----- image helpers -----
-    def _downscale_for_llm(self, jpeg_bytes: bytes) -> bytes:
-        """Shrink frame for LLM to reduce upload size and processing time."""
-        return downscale_jpeg(
-            jpeg_bytes,
-            max_edge=self._cfg.vision.llm_max_edge_px,
-            quality=self._cfg.vision.llm_jpeg_quality,
+    async def _downscale_for_llm(self, jpeg_bytes: bytes) -> bytes:
+        """Shrink frame for LLM to reduce upload size and processing time.
+
+        JPEG decode + resize + re-encode is pure-CPU work that would otherwise
+        block the event loop (stalling audio playback and the vision loop for the
+        duration). Offload it to the default thread-pool executor so the pipeline
+        keeps breathing while a frame is being prepared.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: downscale_jpeg(
+                jpeg_bytes,
+                max_edge=self._cfg.vision.llm_max_edge_px,
+                quality=self._cfg.vision.llm_jpeg_quality,
+            ),
         )
 
     # ----- turn assembly -----
-    def _build_user_turn(self, intent: Intent) -> tuple[str, list[ImageBlock], str]:
+    async def _build_user_turn(self, intent: Intent) -> tuple[str, list[ImageBlock], str]:
         if intent.kind == "chat" and intent.chat is not None:
             m = intent.chat
             return (
@@ -1058,7 +1068,7 @@ class Orchestrator:
                     screen_activity=intent.vision.activity.value,
                     allow_vision_skip=self._cfg.llm.allow_vision_skip,
                 ),
-                [ImageBlock(data=self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")],
+                [ImageBlock(data=await self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")],
                 "vision",
             )
         if intent.kind == "outro":
