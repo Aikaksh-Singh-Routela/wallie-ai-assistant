@@ -54,6 +54,21 @@ def build_orchestrator(runtime: Optional[Runtime] = None) -> Orchestrator:
                 vision_queue = asyncio.Queue(maxsize=4)
                 vision_loop = VisionLoop(cfg.vision, vision_queue)
 
+    hearing_queue = None
+    hearing_loop = None
+    if cfg.hearing.enabled:
+        try:
+            from hearing import HearingEvent, HearingLoop
+        except ModuleNotFoundError as e:
+            logger.error(
+                f"hearing enabled but a dep is missing: {e}. "
+                "Install: pip install soundcard faster-whisper"
+            )
+        else:
+            hearing_queue = asyncio.Queue(maxsize=8)
+            hearing_loop = HearingLoop(cfg.hearing, hearing_queue)
+            logger.info("hearing: enabled (system-audio loopback + STT)")
+
     avatar = None
     if cfg.avatar.enabled:
         try:
@@ -79,6 +94,8 @@ def build_orchestrator(runtime: Optional[Runtime] = None) -> Orchestrator:
         vision_queue=vision_queue,
         avatar=avatar,
         memory_store=memory_store,
+        hearing_loop=hearing_loop,
+        hearing_queue=hearing_queue,
     )
 
 

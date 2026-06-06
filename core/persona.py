@@ -343,6 +343,7 @@ class Persona:
         sentences_max: int = 10,
         topic_drift_style: str = "natural",
         after_vision: bool = False,
+        heard: str = "",
     ) -> str:
         if screen_attached:
             return self._screen_anchored_turn(
@@ -456,6 +457,11 @@ class Persona:
                 "something worth hearing — on a confident take, a callback, or a thought "
                 "that naturally sets up what comes next."
             )
+        if heard:
+            parts.append(
+                f"In the background you can hear: \"{heard}\". If it naturally connects to "
+                "your thought, you may react to it — otherwise ignore it. Don't announce that you heard it."
+            )
         return "\n".join(parts)
 
     def _screen_anchored_turn(
@@ -508,6 +514,7 @@ class Persona:
         adaptation_hint: str = "",
         screen_activity: str = "",
         allow_vision_skip: bool = True,
+        heard: str = "",
     ) -> str:
         p = self.cfg
 
@@ -556,6 +563,12 @@ class Persona:
             )
         if adaptation_hint:
             OWNERSHIP += f"\n{adaptation_hint}"
+        if heard:
+            OWNERSHIP += (
+                f"\n\nYou can also HEAR this right now (audio from the screen): \"{heard}\". "
+                "This is the SAME moment you're seeing — fuse sight and sound into ONE reaction. "
+                "React to what's happening as a whole; don't announce that you heard it, just let it shape your take."
+            )
 
         if change_type == "glance":
             tone_map = {

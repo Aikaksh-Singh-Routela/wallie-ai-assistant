@@ -259,7 +259,11 @@ def _build_app(
 
     @app.put("/api/config")
     async def put_config(payload: dict[str, Any]) -> dict[str, Any]:
-        cfg = AppConfig(**payload)
+        # Merge onto the existing profile so any config section the UI doesn't send
+        # (e.g. hearing) is preserved instead of being silently reset to defaults.
+        existing = load_profile().model_dump()
+        existing.update(payload)
+        cfg = AppConfig(**existing)
         save_profile(cfg, cfg.profile_name)
         return {"ok": True}
 

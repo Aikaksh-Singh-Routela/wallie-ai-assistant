@@ -161,6 +161,18 @@ class VisionConfig(BaseModel):
     startup_delay_sec: float = 5.0
 
 
+class HearingConfig(BaseModel):
+    """Wallie's ears — captures system audio (game/video/music/voice) via loopback,
+    transcribes speech, and feeds it to the orchestrator to fuse with vision."""
+    enabled: bool = False
+    window_sec: float = 5.0          # length of each capture+transcribe window
+    model_size: str = "small"        # faster-whisper model (tiny/base/small/medium)
+    language: str = ""               # "" = auto-detect; or "en", "tr", ...
+    silence_threshold: float = 0.006  # RMS below this = silence, skipped entirely
+    sound_event_threshold: float = 0.06  # loud non-speech still emits a "sound" event
+    max_context_age_sec: float = 12.0    # how long a heard line stays relevant for fusion
+
+
 class ChatConfig(BaseModel):
     youtube_enabled: bool = False
     twitch_enabled: bool = False
@@ -289,6 +301,7 @@ class AppConfig(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     tts: TTSConfig = Field(default_factory=TTSConfig)
     vision: VisionConfig = Field(default_factory=VisionConfig)
+    hearing: HearingConfig = Field(default_factory=HearingConfig)
     chat: ChatConfig = Field(default_factory=ChatConfig)
     topics: TopicConfig = Field(default_factory=TopicConfig)
     orchestrator: OrchestratorConfig = Field(default_factory=OrchestratorConfig)

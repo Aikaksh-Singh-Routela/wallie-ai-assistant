@@ -22,6 +22,7 @@ from vision.capture import downscale_jpeg
 if TYPE_CHECKING:
     from avatar import VTubeStudioAvatar
     from vision import VisionEvent, VisionLoop
+    from hearing import HearingLoop, HearingEvent
 
 from vision.scene_classifier import ChangeType, ScreenActivity
 from vision.vision_memory import SceneMemory, UserBehaviorTracker
@@ -54,6 +55,8 @@ class Orchestrator:
         vision_queue: Optional[asyncio.Queue[VisionEvent]] = None,
         avatar: Optional["VTubeStudioAvatar"] = None,
         memory_store: Optional[MemoryStore] = None,
+        hearing_loop: Optional["HearingLoop"] = None,
+        hearing_queue: Optional["asyncio.Queue[HearingEvent]"] = None,
     ) -> None:
         self._runtime = runtime
         self._cfg: AppConfig = runtime.config
@@ -67,6 +70,10 @@ class Orchestrator:
         self._vision_ready_at: float = 0.0
         self._avatar = avatar
         self._memory = memory_store
+        self._hearing_loop = hearing_loop
+        self._hearing_queue = hearing_queue
+        self._latest_heard: str = ""       # most recent transcript Wallie "hears"
+        self._latest_heard_ts: float = 0.0
 
         oc = self._cfg.orchestrator
         self._conv = Conversation(
@@ -141,6 +148,9 @@ class Orchestrator:
                 asyncio.create_task(_delayed_vision_start(), name="vision-delay")
             else:
                 self._vision_loop.start()
+        if self._hearing_loop:
+            self._hearing_loop.start()
+            logger.info("orchestrator: hearing started")
         self._main_task = asyncio.create_task(self._run(), name="orchestrator")
         d = self._cfg.orchestrator.session_duration_min
         if d > 0:
@@ -160,6 +170,8 @@ class Orchestrator:
                 self._main_task.cancel()
         if self._vision_loop:
             await self._vision_loop.stop()
+        if self._hearing_loop:
+            await self._hearing_loop.stop()
         if self._chat:
             await self._chat.stop()
         self._player.close()
@@ -294,6 +306,7 @@ class Orchestrator:
 
     # --- intent ---
     async def _choose_intent(self) -> Intent:
+        self._drain_hearing()
         highlight = self._pop_highlight_chat()
         if highlight:
             self._mood.on_highlight_chat()
@@ -628,6 +641,33 @@ class Orchestrator:
         if random.random() >= self._cfg.chat.reply_probability:
             return None
         return msg
+
+    # --- hearing (multimodal fusion) ---
+    def _drain_hearing(self) -> None:
+        """Pull all pending HearingEvents and keep the freshest transcript as the
+        'what Wallie is hearing right now' context. This is fused into vision and
+        monologue turns so sight and sound are organized into one coherent reaction
+        — never two competing ones."""
+        if self._hearing_queue is None:
+            return
+        latest = None
+        while True:
+            try:
+                latest = self._hearing_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        if latest is not None and latest.transcript:
+            self._latest_heard = latest.transcript
+            self._latest_heard_ts = time.time()
+
+    def _fresh_heard(self) -> str:
+        """The recent heard transcript, only if still timely; else ''."""
+        if not self._latest_heard:
+            return ""
+        age = time.time() - self._latest_heard_ts
+        if age > self._cfg.hearing.max_context_age_sec:
+            return ""
+        return self._latest_heard
 
     def _pop_latest_vision(self) -> Optional["VisionEvent"]:
         """Drain the vision queue. Returns the most recent change event (if any)
@@ -1067,6 +1107,7 @@ class Orchestrator:
                     adaptation_hint=self._behavior.adaptation_hint(),
                     screen_activity=intent.vision.activity.value,
                     allow_vision_skip=self._cfg.llm.allow_vision_skip,
+                    heard=self._fresh_heard(),
                 ),
                 [ImageBlock(data=await self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")],
                 "vision",
@@ -1102,6 +1143,7 @@ class Orchestrator:
                 sentences_max=oc.segment_sentences_max,
                 topic_drift_style=self._cfg.topics.drift_style,
                 after_vision=self._last_intent_kind == "vision",
+                heard=self._fresh_heard(),
             ),
             images,
             "monologue",
