@@ -113,6 +113,10 @@ Real streamers don't talk at a constant rate. They get excited, they pause to th
 
 ### Vision that isn't narration
 
+
+https://github.com/user-attachments/assets/d824cffa-bd75-4002-a58f-1c6af33ac590
+
+
 Screen reactions are the hardest part to get right. Wallie's approach:
 
 - **First-person ownership** — Wallie owns whatever is on screen. Gaming: "I just got bodied by that boss", not "the character is fighting a boss". Browsing: "let me pull this up", not "the user is browsing". Never third-person, never narration.
