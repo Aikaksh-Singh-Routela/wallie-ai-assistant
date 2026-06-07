@@ -36,5 +36,10 @@ uvicorn[standard]>=0.30.0
 # piper-tts>=1.2.0
 # onnxruntime>=1.17.0
 
+# Optional: HEARING (system-audio loopback + speech-to-text + music analysis).
+# Required only if you enable hearing. Install with: pip install soundcard faster-whisper
+# soundcard>=0.4.3
+# faster-whisper>=1.0.0
+
 # Utilities
 orjson>=3.10.0
