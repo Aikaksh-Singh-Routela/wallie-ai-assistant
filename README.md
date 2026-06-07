@@ -4,21 +4,34 @@ https://github.com/user-attachments/assets/bb4404e5-9138-4288-a428-345486b86f7e
 
 <p align="center">
   <h1 align="center">Wallie</h1>
-  <p align="center"><strong>The open-source AI streamer that actually feels alive.</strong></p>
-  <p align="center">
-    <a href="https://spontaneous-dodol-cabb7d.netlify.app/">Website</a> &nbsp;·&nbsp;
-    <a href="#quick-start">Quick Start</a> &nbsp;·&nbsp;
-    <a href="#features">Features</a> &nbsp;·&nbsp;
-    <a href="#the-dashboard">Dashboard</a> &nbsp;·&nbsp;
-    <a href="#architecture">Architecture</a> &nbsp;·&nbsp;
-    <a href="#roadmap">Roadmap</a>
-  </p>
-  <p align="center">
-    <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" />
-    <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-brightgreen.svg" />
-    <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" />
-  </p>
+  <p align="center"><strong>The open-source AI streamer that sees, hears &amp; reacts — and actually feels alive.</strong></p>
 </p>
+
+<p align="center">
+  <a href="https://github.com/Alradyin/wallie-V2/archive/refs/heads/main.zip"><img alt="Download" src="https://img.shields.io/badge/Download_ZIP-2ea44f?style=for-the-badge&logo=github&logoColor=white" /></a>
+  &nbsp;
+  <a href="https://spontaneous-dodol-cabb7d.netlify.app/"><img alt="Website" src="https://img.shields.io/badge/Website-6c8cff?style=for-the-badge" /></a>
+  &nbsp;
+  <a href="https://github.com/Alradyin/wallie-V2/blob/main/docs/guide.md"><img alt="Docs" src="https://img.shields.io/badge/Docs-555?style=for-the-badge" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Alradyin/wallie-V2/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Alradyin/wallie-V2?style=social" /></a>
+  &nbsp;&nbsp;
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg" />
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-brightgreen.svg" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" />
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> &nbsp;·&nbsp;
+  <a href="#features">Features</a> &nbsp;·&nbsp;
+  <a href="#the-dashboard">Dashboard</a> &nbsp;·&nbsp;
+  <a href="#architecture">Architecture</a> &nbsp;·&nbsp;
+  <a href="#roadmap">Roadmap</a>
+</p>
+
+> ⭐ **If you think an AI that watches _and hears_ your screen should exist — give it a star.** Two seconds, and it genuinely helps a solo dev keep shipping.
 
 ---
 
