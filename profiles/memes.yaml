@@ -87,8 +87,8 @@ persona:
   - the one he calls elite to this day
   personal_beat_rate: 0.3
 llm:
-  provider: openrouter
-  model: anthropic/claude-sonnet-4-6
+  provider: groq
+  model: meta-llama/llama-4-scout-17b-16e-instruct
   temperature: 0.95
   top_p: 0.95
   max_tokens: 220
@@ -111,7 +111,7 @@ tts:
   piper_model_path: ''
   piper_length_scale: 1.0
 vision:
-  enabled: true
+  enabled: false
   source: monitor
   monitor_index: 1
   interval_sec: 1.5
@@ -136,8 +136,8 @@ vision:
 hearing:
   enabled: true
   window_sec: 5.0
-  model_size: small
-  language: ''
+  model_size: medium
+  language: en
   silence_threshold: 0.006
   sound_event_threshold: 0.06
   max_context_age_sec: 12.0

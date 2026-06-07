@@ -4,7 +4,9 @@ from __future__ import annotations
 import asyncio
 import random
 import time
+from collections import deque
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from loguru import logger
@@ -30,7 +32,7 @@ from core.attention import AttentionEngine, VisionDirective, VisionReaction
 from core.mood import MoodEngine
 from core.memory_store import MemoryStore
 
-IntentKind = Literal["chat", "vision", "monologue", "outro"]
+IntentKind = Literal["chat", "vision", "monologue", "outro", "hearing"]
 
 
 @dataclass
@@ -40,6 +42,7 @@ class Intent:
     vision: Optional[VisionEvent] = None
     urgent: bool = False
     vision_directive: Optional[VisionDirective] = None
+    heard: str = ""  # for kind="hearing": the audio context to react to
 
 
 class Orchestrator:
@@ -74,6 +77,14 @@ class Orchestrator:
         self._hearing_queue = hearing_queue
         self._latest_heard: str = ""       # most recent transcript Wallie "hears"
         self._latest_heard_ts: float = 0.0
+        self._last_reacted_heard: str = ""   # last audio context Wallie reacted to
+        self._last_hearing_turn_ts: float = 0.0
+        # Rolling log of (ts, normalized_text) Wallie recently SPOKE — used to reject
+        # self-echo in the hearing transcript (our own TTS bleeding through loopback).
+        self._recent_spoken: "deque[tuple[float, str]]" = deque(maxlen=24)
+        # Wire the content-based self-echo guard into the ear we were handed.
+        if self._hearing_loop is not None:
+            self._hearing_loop._is_self_echo = self._is_self_echo
 
         oc = self._cfg.orchestrator
         self._conv = Conversation(
@@ -375,6 +386,19 @@ class Orchestrator:
             self._mood.on_ordinary_chat()
             return Intent(kind="chat", chat=ordinary, urgent=False)
 
+        # HEARING reaction — when there's fresh, NEW audio context and nothing more
+        # urgent took priority, react to what Wallie hears (just like vision reacts to
+        # what it sees). This is what drives pure-hearing mode instead of blank monologue.
+        if self._cfg.hearing.enabled:
+            heard = self._fresh_heard()
+            now_h = time.time()
+            if (heard and heard != self._last_reacted_heard
+                    and now_h - self._last_hearing_turn_ts >= 6.0):
+                self._last_reacted_heard = heard
+                self._last_hearing_turn_ts = now_h
+                self._mood.on_scene_change()
+                return Intent(kind="hearing", heard=heard, urgent=False)
+
         if self._cfg.vision.organic_vision and self._attention.should_hold_silence(
             mood_silence_probability=self._mood.silence_probability(),
             in_monologue_flow=self._segments_in_monologue_flow() >= 2,
@@ -435,6 +459,17 @@ class Orchestrator:
             return Intent(kind="monologue", vision_directive=VisionDirective(
                 reaction=VisionReaction.SILENCE, target_sentences=0,
                 rationale="vision-mode: quiet between reactions",
+            ))
+
+        # Pure-hearing mode (hearing on, no vision): do NOT fall back to a blank
+        # monologue — that makes Wallie talk non-stop, which keeps self-mute engaged
+        # and the mic never actually hears anything. Instead stay quiet and LISTEN, so
+        # self-mute clears, the ear catches audio, and the next loop reacts to it.
+        if self._cfg.hearing.enabled:
+            self._mood.on_silence_beat()
+            return Intent(kind="monologue", vision_directive=VisionDirective(
+                reaction=VisionReaction.SILENCE, target_sentences=0,
+                rationale="hearing-mode: quiet, listening between reactions",
             ))
 
         return Intent(kind="monologue")
@@ -656,8 +691,23 @@ class Orchestrator:
                 latest = self._hearing_queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
-        if latest is not None and latest.transcript:
-            self._latest_heard = latest.transcript
+        if latest is None:
+            return
+        heard = ""
+        if latest.sound_type == "speech" and latest.transcript:
+            if self._is_self_echo(latest.transcript):
+                return  # our own voice came back through the loopback — ignore
+            heard = latest.transcript
+            # If the speech rode on top of music, tag the vibe so Wallie knows
+            # it's a *song* (lyrics + mood), not just someone talking.
+            if latest.descriptor:
+                heard = f'{latest.transcript} [{latest.descriptor} music]'
+        elif latest.sound_type == "music":
+            heard = f"({latest.descriptor or 'music'} music playing)"
+        elif latest.sound_type == "sound":
+            heard = f"({latest.descriptor or 'a sound'})"
+        if heard:
+            self._latest_heard = heard
             self._latest_heard_ts = time.time()
 
     def _fresh_heard(self) -> str:
@@ -668,6 +718,42 @@ class Orchestrator:
         if age > self._cfg.hearing.max_context_age_sec:
             return ""
         return self._latest_heard
+
+    @staticmethod
+    def _norm_for_echo(text: str) -> str:
+        return " ".join("".join(c for c in text.lower() if c.isalnum() or c.isspace()).split())
+
+    def _note_spoken(self, text: str) -> None:
+        """Remember a line Wallie just said, so the ear can reject hearing it back."""
+        t = self._norm_for_echo(text)
+        if len(t) >= 4:
+            self._recent_spoken.append((time.time(), t))
+
+    def _is_self_echo(self, heard: str) -> bool:
+        """True if `heard` closely matches something Wallie said in the last ~20s.
+
+        Content-based (not timing) so it catches self-echo even when the loopback
+        capture lags several seconds behind Wallie's actual speech.
+        """
+        h = self._norm_for_echo(heard)
+        if len(h) < 4:
+            return False
+        h_tokens = set(h.split())
+        now = time.time()
+        for ts, said in self._recent_spoken:
+            if now - ts > 20.0:
+                continue
+            if h in said or said in h:
+                return True
+            if SequenceMatcher(None, h, said).ratio() >= 0.6:
+                return True
+            # Heavy token overlap (heard is mostly a subset of a recent line).
+            if h_tokens:
+                said_tokens = set(said.split())
+                overlap = len(h_tokens & said_tokens) / len(h_tokens)
+                if overlap >= 0.7:
+                    return True
+        return False
 
     def _pop_latest_vision(self) -> Optional["VisionEvent"]:
         """Drain the vision queue. Returns the most recent change event (if any)
@@ -768,6 +854,8 @@ class Orchestrator:
             }
             max_tok = min(max_tok, _vision_tok_caps.get(
                 intent.vision_directive.reaction, 100))
+        elif intent.kind == "hearing":
+            max_tok = min(max_tok, 140)
         allow_repeat = intent.kind == "outro"
 
         streamer = SentenceStreamer()
@@ -888,6 +976,7 @@ class Orchestrator:
                         await self._play_buffered(spoken_parts[-1] if spoken_parts else sent, audio)
                     in_flight.append(asyncio.create_task(self._buffer_tts(sent)))
                     spoken_parts.append(sent)
+                    self._note_spoken(sent)
                     logger.info(f"say> {sent}")
             for task in in_flight:
                 try:
@@ -968,6 +1057,7 @@ class Orchestrator:
     async def _stream_sentence_direct(self, sentence: str, spoken_parts: list[str]) -> None:
         """First sentence of a segment: stream chunk-by-chunk for the lowest TTFA."""
         spoken_parts.append(sentence)
+        self._note_spoken(sentence)
         logger.info(f"say> {sentence}")
         await self._avatar_safe_call("trigger_emotion_from_text", sentence)
         await self._avatar_safe_call("set_speaking", True)
@@ -1112,6 +1202,19 @@ class Orchestrator:
                 [ImageBlock(data=await self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")],
                 "vision",
             )
+        if intent.kind == "hearing":
+            energy = (self._mood.arousal + self._mood.talkativity) / 2.0
+            target = random.choice([1, 2, 2]) if energy < 0.6 else random.choice([2, 2, 3])
+            return (
+                self._persona.hearing_turn(
+                    heard=intent.heard or self._fresh_heard(),
+                    mood_label=self._mood.label,
+                    target_sentences=target,
+                ),
+                [],
+                "hearing",
+            )
+
         if intent.kind == "outro":
             mins = (time.time() - self._session_start_ts) / 60.0 if self._session_start_ts else 0.0
             return (self._persona.outro_turn(minutes_streamed=mins), [], "outro")

@@ -66,8 +66,15 @@ def build_orchestrator(runtime: Optional[Runtime] = None) -> Orchestrator:
             )
         else:
             hearing_queue = asyncio.Queue(maxsize=8)
-            hearing_loop = HearingLoop(cfg.hearing, hearing_queue)
-            logger.info("hearing: enabled (system-audio loopback + STT)")
+            # Mute hearing for the capture window PLUS a tail margin: the ear grabs
+            # the last `window_sec` of audio, so to be sure none of it contains Wallie's
+            # own voice we also cover the playback that's still draining after the write.
+            self_mute_window = cfg.hearing.window_sec + 2.5
+            hearing_loop = HearingLoop(
+                cfg.hearing, hearing_queue,
+                is_self_speaking=lambda: player.speaking_recently(self_mute_window),
+            )
+            logger.info("hearing: enabled (system-audio loopback + STT, self-muted while speaking)")
 
     avatar = None
     if cfg.avatar.enabled:

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 from collections import deque
 from typing import Optional
 
@@ -33,6 +34,7 @@ class AudioPlayer:
 
         self._stream: Optional[sd.RawOutputStream] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._last_write_ts: float = 0.0  # when audio was last queued (for hearing self-mute)
 
     # ----- lifecycle -----
     def start(self) -> None:
@@ -76,8 +78,14 @@ class AudioPlayer:
             return
         with self._lock:
             self._buf.extend(pcm)
+        self._last_write_ts = time.time()
         self._finished_event.clear()
         await asyncio.sleep(0)
+
+    def speaking_recently(self, window: float) -> bool:
+        """True if Wallie is currently outputting audio or did within `window` seconds.
+        Used by hearing to skip windows that contain Wallie's own voice (no self-echo)."""
+        return self.seconds_queued() > 0.02 or (time.time() - self._last_write_ts) < window
 
     def boundary(self) -> None:
         if self._pending_odd is not None:

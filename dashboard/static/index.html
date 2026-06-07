@@ -623,10 +623,11 @@
           <select x-model="cfg.hearing.model_size">
             <option value="tiny">tiny (fastest)</option>
             <option value="base">base</option>
-            <option value="small">small (recommended)</option>
-            <option value="medium">medium (accurate, slower)</option>
+            <option value="small">small</option>
+            <option value="medium">medium (recommended w/ GPU)</option>
+            <option value="large-v3">large-v3 (best lyrics, GPU)</option>
           </select>
-          <small class="hint">Local speech-to-text model. Bigger = more accurate but slower.</small>
+          <small class="hint">Local speech-to-text. Bigger = more accurate, esp. for song lyrics. Runs on GPU automatically if you have CUDA (so medium stays fast); else CPU. For lyrics, medium + setting the language below helps a lot.</small>
         </div>
         <div class="field">
           <label>Language</label>

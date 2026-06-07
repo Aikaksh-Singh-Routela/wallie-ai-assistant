@@ -660,6 +660,34 @@ class Persona:
             + SCREEN_ANCHOR + VOICE + OWNERSHIP
         )
 
+    def hearing_turn(self, *, heard: str = "", mood_label: str = "",
+                     target_sentences: int = 2) -> str:
+        """React to AUDIO the streamer just heard — the auditory counterpart to
+        vision_turn. Music, a video, someone talking. React to it, don't narrate it."""
+        p = self.cfg
+        mood_hint = f" Mood: {mood_label}." if mood_label else ""
+        return (
+            f'You just HEARD this — audio playing right now (could be music, a video, or '
+            f'someone talking): "{heard}".\n\n'
+            "React to it like a streamer reacting to audio — your gut take, a joke, an "
+            "opinion, a vibe check.\n"
+            "RULES:\n"
+            "- React to what you HEARD specifically. NEVER narrate 'I hear...' or 'the audio says' "
+            "— just react as if it's happening around you.\n"
+            "- If it's music: react to the vibe, energy, or the lyrics. If it's speech: react to "
+            "what was actually said.\n"
+            "- Words in [brackets] or (parentheses) describe the music's MOOD, feel and MIX "
+            "(tempo, major/minor, texture, production like crisp/muddy/harsh/punchy) — let that "
+            "drive your reaction, don't read it aloud.\n"
+            "- Have an OPINION on it when you've got one: is it a banger, mid, a slapper, cursed, "
+            "overproduced, a whole vibe, or just kinda bad? Rate it like a streamer reacting to what's "
+            "playing — your honest taste, not every time, only when you actually feel it.\n"
+            "- Be specific and punchy. No generic filler, no explaining.\n"
+            "- NEVER repeat what you already said.\n"
+            f"- {max(1, target_sentences)} sentence(s) max."
+            f"\n\nVoice: {p.name}, {p.energy}, natural and conversational.{mood_hint}"
+        )
+
     def outro_turn(self, *, minutes_streamed: float) -> str:
         return (
             f"The stream is wrapping up. You've been on for about {int(minutes_streamed)} minutes. "
