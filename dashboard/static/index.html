@@ -6,6 +6,55 @@
   <title>Wallie · Control Room</title>
   <link rel="stylesheet" href="/static/style.css" />
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <style>
+  /* ===== First-run setup wizard (self-contained, .wz- scoped) ===== */
+  [x-cloak]{display:none!important}
+  .wz-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:rgba(4,4,10,.74);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .wz-card{width:100%;max-width:620px;max-height:92vh;overflow:auto;background:linear-gradient(180deg,#10101f,#0b0b16);border:1px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:0 40px 120px rgba(0,0,0,.6),0 0 0 1px rgba(138,155,255,.08);color:#f5f6fb;font-family:inherit}
+  .wz-head{display:flex;align-items:center;justify-content:space-between;padding:1.5rem 1.75rem 1rem}
+  .wz-steps{display:flex;gap:.5rem;align-items:center}
+  .wz-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;background:rgba(255,255,255,.07);color:#8a8caa;border:1px solid rgba(255,255,255,.08);transition:.2s}
+  .wz-dot.on{background:linear-gradient(120deg,#5fd0ff,#b18cff);color:#06060e;border-color:transparent}
+  .wz-dot.done{background:rgba(95,208,255,.18);color:#5fd0ff}
+  .wz-x{background:none;border:none;color:#8a8caa;font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .4rem;border-radius:8px}
+  .wz-x:hover{color:#fff;background:rgba(255,255,255,.06)}
+  .wz-body{padding:.5rem 1.75rem 1.5rem}
+  .wz-title{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:.4rem 0 .35rem}
+  .wz-sub{color:#a8aac4;font-size:.95rem;line-height:1.55;margin-bottom:1.4rem}
+  .wz-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+  .wz-opt{text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.1rem 1.2rem;cursor:pointer;transition:.2s;color:inherit;font-family:inherit}
+  .wz-opt:hover{border-color:rgba(138,155,255,.55);background:rgba(138,155,255,.08);transform:translateY(-2px)}
+  .wz-opt.sel{border-color:#8a9bff;background:rgba(138,155,255,.12)}
+  .wz-opt h4{font-size:1.02rem;font-weight:700;margin:0 0 .25rem;display:flex;align-items:center;gap:.45rem}
+  .wz-opt p{font-size:.84rem;color:#a8aac4;line-height:1.45;margin:0}
+  .wz-badge{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:.12rem .5rem;border-radius:980px;background:rgba(95,208,255,.16);color:#5fd0ff}
+  .wz-price{font-size:.78rem;color:#6b6d88;margin-top:.5rem}
+  .wz-keyrow{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.1rem 1.2rem;margin-bottom:.8rem}
+  .wz-keyrow .wz-kh{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+  .wz-keyrow label{font-weight:600;font-size:.95rem}
+  .wz-getlink{font-size:.8rem;color:#5fd0ff;text-decoration:none;white-space:nowrap}
+  .wz-getlink:hover{text-decoration:underline}
+  .wz-inrow{display:flex;gap:.5rem}
+  .wz-inrow input{flex:1;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:.6rem .8rem;color:#fff;font-size:.9rem;font-family:inherit;outline:none}
+  .wz-inrow input:focus{border-color:#8a9bff}
+  .wz-msg{font-size:.82rem;margin-top:.5rem}
+  .wz-msg.ok{color:#34d399}
+  .wz-msg.bad{color:#f87171}
+  .wz-note{font-size:.82rem;color:#a8aac4;background:rgba(95,208,255,.07);border:1px solid rgba(95,208,255,.16);border-radius:12px;padding:.8rem 1rem;line-height:1.5;margin-top:.4rem}
+  .wz-foot{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 1.75rem 1.6rem;border-top:1px solid rgba(255,255,255,.07)}
+  .wz-btn{border:none;cursor:pointer;font-family:inherit;font-weight:700;font-size:.95rem;padding:.7rem 1.5rem;border-radius:980px;transition:.2s}
+  .wz-btn.primary{background:linear-gradient(120deg,#5fd0ff,#8a9bff 50%,#b18cff);color:#06060e}
+  .wz-btn.primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .wz-btn.primary:disabled{opacity:.4;cursor:not-allowed;filter:none;transform:none}
+  .wz-btn.ghost{background:rgba(255,255,255,.06);color:#d6d8ea}
+  .wz-btn.ghost:hover{background:rgba(255,255,255,.1)}
+  .wz-skip{background:none;border:none;color:#6b6d88;font-size:.85rem;cursor:pointer;font-family:inherit}
+  .wz-skip:hover{color:#a8aac4}
+  .wz-done{text-align:center;padding:1rem 0 .5rem}
+  .wz-done .wz-check{font-size:3rem;margin-bottom:.5rem}
+  .wz-setup-btn{background:rgba(138,155,255,.14)!important;border:1px solid rgba(138,155,255,.3)!important}
+  @media(max-width:560px){.wz-grid{grid-template-columns:1fr}}
+  </style>
 </head>
 <body x-data="app()" x-init="init()" :class="{ 'drawer-open': drawerOpen }">
 
@@ -39,6 +88,7 @@
     <button class="btn primary" x-show="!running" @click="start">Start</button>
     <button class="btn warn" x-show="running" @click="stop">Stop</button>
     <button class="btn ghost panic" x-show="running" @click="resetAudio()" title="Flush audio buffer (kills static / stuck playback)">⚠ reset audio</button>
+    <button class="btn ghost wz-setup-btn" @click="openWizard()" title="Setup wizard">✨ Setup</button>
     <button class="btn ghost" @click="drawerOpen = !drawerOpen" title="Toggle live panel">
       <span x-text="drawerOpen ? '›' : '‹'"></span>
     </button>
@@ -1046,6 +1096,110 @@
       </div>
     </div>
   </aside>
+</div>
+
+<!-- ============ FIRST-RUN SETUP WIZARD ============ -->
+<div class="wz-overlay" x-show="wizard.open" x-cloak @keydown.escape.window="closeWizard()">
+  <div class="wz-card" @click.outside="closeWizard()">
+    <div class="wz-head">
+      <div class="wz-steps">
+        <template x-for="n in 4" :key="n">
+          <div class="wz-dot" :class="{ on: wizard.step === n, done: wizard.step > n }" x-text="wizard.step > n ? '✓' : n"></div>
+        </template>
+      </div>
+      <button class="wz-x" @click="closeWizard()" title="Close">×</button>
+    </div>
+
+    <div class="wz-body">
+      <!-- STEP 1: PERSONA -->
+      <div x-show="wizard.step === 1">
+        <div class="wz-title">Welcome to Wallie 👋</div>
+        <div class="wz-sub">Pick a personality to start from — you can fully customize it later, or build one from scratch.</div>
+        <div class="wz-grid">
+          <template x-for="p in profiles" :key="p">
+            <button class="wz-opt" :class="{ sel: activeProfile === p }" @click="wizardPickProfile(p)" :disabled="wizard.busy">
+              <h4 x-text="p"></h4>
+              <p>Load the "<span x-text="p"></span>" personality preset.</p>
+            </button>
+          </template>
+          <button class="wz-opt" @click="wizardStartFresh()">
+            <h4>✏️ Start fresh</h4>
+            <p>Keep the current profile and design your own character.</p>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: BUDGET PATH -->
+      <div x-show="wizard.step === 2">
+        <div class="wz-title">Pick your setup</div>
+        <div class="wz-sub">Wallie runs on your own keys — your cost, no middleman. Choose a path; you can change any of it later.</div>
+        <div class="wz-grid" style="grid-template-columns:1fr">
+          <button class="wz-opt" :class="{ sel: wizard.path === 'free' }" @click="wizardChoosePath('free')" :disabled="wizard.busy">
+            <h4>🆓 Free <span class="wz-badge">$0 / hr</span></h4>
+            <p>Gemini (free key) for brains + Piper local voice. Great for testing.</p>
+            <div class="wz-price">Needs: 1 free key &middot; voice runs locally</div>
+          </button>
+          <button class="wz-opt" :class="{ sel: wizard.path === 'cheap' }" @click="wizardChoosePath('cheap')" :disabled="wizard.busy">
+            <h4>⚡ Fast &amp; cheap <span class="wz-badge">recommended</span></h4>
+            <p>Groq (free tier) for brains + Fish Audio voice. Best balance of speed and quality.</p>
+            <div class="wz-price">~$1.50 / hr &middot; 2 keys</div>
+          </button>
+          <button class="wz-opt" :class="{ sel: wizard.path === 'premium' }" @click="wizardChoosePath('premium')" :disabled="wizard.busy">
+            <h4>💎 Premium</h4>
+            <p>Claude Sonnet for brains + ElevenLabs voice. Best quality and vision.</p>
+            <div class="wz-price">~$6.50 / hr &middot; 2 keys</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: KEYS -->
+      <div x-show="wizard.step === 3">
+        <div class="wz-title">Add your key<span x-show="(wizardKeys()||[]).length > 1">s</span></div>
+        <div class="wz-sub">Paste each key and we'll save &amp; test it instantly. Click "Get key" to grab one — it takes a minute.</div>
+        <template x-for="k in wizardKeys()" :key="k.env">
+          <div class="wz-keyrow">
+            <div class="wz-kh">
+              <label><span x-text="k.label"></span> <span class="wz-badge" x-show="k.free">free</span></label>
+              <a class="wz-getlink" :href="k.url" target="_blank" rel="noopener">Get key ↗</a>
+            </div>
+            <div class="wz-inrow" x-show="!wizardKeyIsSet(k.env) || (wizard.keyDrafts[k.env] ?? '') !== ''">
+              <input type="password" placeholder="Paste key here" x-model="wizard.keyDrafts[k.env]" @keydown.enter="wizardSaveKey(k.env)" />
+              <button class="wz-btn primary" @click="wizardSaveKey(k.env)" :disabled="wizard.keyBusy[k.env] || !(wizard.keyDrafts[k.env])">Save</button>
+            </div>
+            <div class="wz-msg ok" x-show="wizardKeyIsSet(k.env) && (wizard.keyDrafts[k.env] ?? '') === ''">✓ saved &amp; ready</div>
+            <div class="wz-msg" :class="(wizard.keyMsg[k.env]||'').startsWith('✓') ? 'ok' : 'bad'" x-show="wizard.keyMsg[k.env]" x-text="wizard.keyMsg[k.env]"></div>
+          </div>
+        </template>
+        <div class="wz-note" x-show="wizardPathIsFree()">
+          🔊 Free voice (Piper) runs locally and needs one extra step: in a terminal run
+          <code>pip install piper-tts onnxruntime</code> then
+          <code>python scripts/download_piper_voice.py en_US-amy-medium</code>.
+          Prefer zero setup? Pick a paid voice in the Voice tab instead — everything else is ready.
+        </div>
+      </div>
+
+      <!-- STEP 4: DONE -->
+      <div x-show="wizard.step === 4">
+        <div class="wz-done">
+          <div class="wz-check">🎉</div>
+          <div class="wz-title">You're all set</div>
+          <div class="wz-sub" style="margin-bottom:.5rem">Your streamer is configured. Hit start and Wallie comes alive — or fine-tune anything in the dashboard first.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wz-foot">
+      <div>
+        <button class="wz-btn ghost" x-show="wizard.step > 1 && wizard.step < 4" @click="wizardBack()">← Back</button>
+      </div>
+      <div style="display:flex;gap:.7rem;align-items:center">
+        <button class="wz-skip" x-show="wizard.step < 4" @click="finishWizard()">Skip setup</button>
+        <button class="wz-btn primary" x-show="wizard.step === 3" :disabled="!wizardKeysReady()" @click="wizard.step = 4">Continue →</button>
+        <button class="wz-btn ghost" x-show="wizard.step === 4" @click="finishWizard()">I'll start later</button>
+        <button class="wz-btn primary" x-show="wizard.step === 4" :disabled="wizard.busy" @click="wizardFinishAndStart()">Start streaming ▶</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="/static/app.js"></script>

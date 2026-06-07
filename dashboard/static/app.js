@@ -64,6 +64,20 @@ const MODEL_OPTIONS = {
   ollama: [],
 };
 
+// First-run wizard: budget path -> provider config + required keys.
+const WIZARD_PATHS = {
+  free:    { llm: "gemini",    model: "gemini-2.5-flash",                            tts: "piper",      keys: ["GEMINI_API_KEY"] },
+  cheap:   { llm: "groq",      model: "meta-llama/llama-4-scout-17b-16e-instruct",   tts: "fish",       keys: ["GROQ_API_KEY", "FISH_API_KEY"] },
+  premium: { llm: "anthropic", model: "claude-sonnet-4-6",                           tts: "elevenlabs", keys: ["ANTHROPIC_API_KEY", "ELEVENLABS_API_KEY"] },
+};
+const WIZARD_KEYMETA = {
+  GEMINI_API_KEY:     { env: "GEMINI_API_KEY",     provider: "gemini",     label: "Google AI Studio (Gemini)", url: "https://aistudio.google.com/apikey",                 free: true },
+  GROQ_API_KEY:       { env: "GROQ_API_KEY",       provider: "groq",       label: "Groq",                      url: "https://console.groq.com/keys",                      free: true },
+  FISH_API_KEY:       { env: "FISH_API_KEY",       provider: "fish",       label: "Fish Audio (voice)",        url: "https://fish.audio/go-api/",                         free: false },
+  ANTHROPIC_API_KEY:  { env: "ANTHROPIC_API_KEY",  provider: "anthropic",  label: "Anthropic (Claude)",        url: "https://console.anthropic.com/settings/keys",        free: false },
+  ELEVENLABS_API_KEY: { env: "ELEVENLABS_API_KEY", provider: "elevenlabs", label: "ElevenLabs (voice)",        url: "https://elevenlabs.io/app/settings/api-keys",        free: false },
+};
+
 function emptyCfg() {
   return {
     profile_name: "default",
@@ -178,11 +192,15 @@ function app() {
     secretMsg: {},       // env -> "saved" / "tested ✓" / error text
     secretBusy: {},      // env -> bool (test in flight)
 
+    // First-run setup wizard (additive — reuses config/secrets/start APIs, breaks nothing).
+    wizard: { open: false, step: 1, path: "", busy: false, keyDrafts: {}, keyMsg: {}, keyBusy: {} },
+
     async init() {
       await this.loadProfiles();
       await this.loadConfig();
       await this.refreshStatus();
       await this.loadSecrets();
+      this.wizardMaybeOpen();
       this.connectWs();
       setInterval(() => this.refreshStatus(), 2000);
       setInterval(() => this.refreshAvatarStatus(), 3000);
@@ -545,6 +563,83 @@ function app() {
         this.cfg.llm.model = models[0].id;
         this.cfg.llm.vision_capable = models[0].vision;
       }
+    },
+
+    // ---------- first-run setup wizard ----------
+    wizardMaybeOpen() {
+      try { if (localStorage.getItem("wallie_setup_done")) return; } catch {}
+      const hasLLMKey = (this.secrets || []).some(s => s.kind === "llm" && s.is_set);
+      if (!hasLLMKey) { this.wizard.step = 1; this.wizard.open = true; }
+    },
+    openWizard() { this.wizard.step = 1; this.wizard.open = true; },
+    closeWizard() { this.wizard.open = false; },
+    finishWizard() {
+      try { localStorage.setItem("wallie_setup_done", "1"); } catch {}
+      this.wizard.open = false;
+    },
+    wizardBack() { if (this.wizard.step > 1) this.wizard.step--; },
+
+    async wizardPickProfile(name) {
+      this.wizard.busy = true;
+      try { await this.switchProfile(name); } finally { this.wizard.busy = false; }
+      this.wizard.step = 2;
+    },
+    wizardStartFresh() { this.wizard.step = 2; },
+
+    async wizardChoosePath(path) {
+      const P = WIZARD_PATHS[path];
+      if (!P) return;
+      this.wizard.path = path;
+      this.cfg.llm.provider = P.llm;
+      this.cfg.llm.model = P.model;
+      this.cfg.llm.vision_capable = true;
+      this.cfg.tts.provider = P.tts;
+      this.wizard.busy = true;
+      try { await this.save(); } finally { this.wizard.busy = false; }
+      this.wizard.step = 3;
+    },
+
+    wizardKeys() {
+      return (WIZARD_PATHS[this.wizard.path]?.keys || []).map(env => WIZARD_KEYMETA[env]).filter(Boolean);
+    },
+    wizardKeyIsSet(env) {
+      return (this.secrets || []).some(s => s.env === env && s.is_set);
+    },
+    wizardPathIsFree() { return this.wizard.path === "free"; },
+    async wizardSaveKey(env) {
+      const value = this.wizard.keyDrafts[env] ?? "";
+      if (!value) return;
+      this.wizard.keyBusy[env] = true;
+      this.wizard.keyMsg[env] = "saving…";
+      try {
+        const r = await fetch("/api/secrets", {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ env, value }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        delete this.wizard.keyDrafts[env];
+        await this.loadSecrets();
+        const meta = WIZARD_KEYMETA[env];
+        const tr = await fetch("/api/secrets/test", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: meta.provider }),
+        });
+        const td = await tr.json();
+        this.wizard.keyMsg[env] = td.ok ? "✓ working" : `✗ ${td.error || "saved — test failed"}`;
+      } catch (e) {
+        this.wizard.keyMsg[env] = `✗ ${e}`;
+      } finally {
+        this.wizard.keyBusy[env] = false;
+      }
+    },
+    wizardKeysReady() {
+      const keys = WIZARD_PATHS[this.wizard.path]?.keys || [];
+      return keys.length > 0 && keys.every(env => this.wizardKeyIsSet(env));
+    },
+    async wizardFinishAndStart() {
+      this.wizard.busy = true;
+      try { await this.save(); await this.start(); } finally { this.wizard.busy = false; }
+      this.finishWizard();
     },
 
     formatHMS,
