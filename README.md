@@ -33,8 +33,9 @@ You design the streamer. Wallie runs the show.
 ```
    persona  ──┐
    topics   ──┤
-   chat     ──┼──►  Wallie  ──►  Voice (TTS)  ──►  OBS / virtual cable  ──►  your stream
-   vision   ──┤             ──►  Live2D avatar (VTube Studio)
+   chat     ──┤
+   vision   ──┼──►  Wallie  ──►  Voice (TTS)  ──►  OBS / virtual cable  ──►  your stream
+   hearing  ──┤             ──►  Live2D avatar (VTube Studio)
    schedule ──┘
 ```
 
@@ -124,6 +125,18 @@ Screen reactions are the hardest part to get right. Wallie's approach:
 - **Activity adaptation** — detects scrolling, typing, app-switching, video playback and adjusts reactions accordingly. Typing → ignore. App switch → react. Rapid browsing → wait until user settles. Each activity type gets context-aware prompting.
 - **Attention engine** — not every screen change gets the same treatment. DEEP reactions (22%), quick GLANCEs (28%), personal TANGENTs (5%), deliberate IGNOREs (27%), and SILENCE beats (18%). Streak fatigue prevents reacting the same way twice in a row.
 - **Scene memory** — remembers what it last said about the current screen. Dedupe threshold at 0.65 with per-sentence comparison catches paraphrased repetition.
+
+### Hearing — it reacts to what it hears, not just what it sees
+
+Wallie captures your system audio (WASAPI loopback) and reacts to it live, fused with vision into a single reaction — sight and sound, one voice. Just like you organize your senses, not two narrators talking over each other.
+
+- **Speech & lyrics** — local speech-to-text (faster-whisper) transcribes videos, voice chat, and song lyrics. Auto-uses your GPU if available, clean CPU fallback if not.
+- **Real music understanding** — pure-numpy DSP, no extra ML weight. It reads **major/minor key → mood**, tempo + beat strength, instrumentation texture (bass-heavy / acoustic / airy / lo-fi), and production quality (crisp / muddy / harsh). A sad song reads as melancholy; a beat drop reads as energy. It'll call a track a banger or roast a muddy mix.
+- **Multimodal fusion** — what it hears is fused with what it sees into one coherent reaction, never two competing ones.
+- **No self-echo** — content-based guard so Wallie never reacts to its own TTS bleeding back through the loopback.
+- **Pure-hearing mode** — run it with vision off and it reacts to audio the way it reacts to a screen: stays quiet, listens, then reacts to what's playing.
+
+Enable it in the dashboard's Hearing section. Needs two extra deps: `pip install soundcard faster-whisper`.
 
 ### Live2D avatar with emotion
 
@@ -425,7 +438,6 @@ Verify the key in API Keys — the masked preview should match your provider das
 
 What's coming next:
 
-- **Hearing** — real-time audio input so Wallie can listen and react to game audio, music, voice chat, and stream alerts. Not just eyes — ears too.
 - **Streaming avatar backend (HeyGen)** — realistic-looking avatars as an alternative to Live2D
 - **First-run wizard** — guided setup that walks you through provider choice → key entry → first stream
 - **Docker image** — `docker run wallie` with a volume for config
