@@ -25,6 +25,11 @@ class OpenAICompatProvider(LLMProvider):
         self.name = name
         self.model = model
         self.supports_vision = supports_vision
+        # OpenRouter passes `cache_control` breakpoints through to providers that
+        # support prompt caching (Anthropic, Gemini). Direct OpenAI/Groq reject the
+        # field, so only enable it for OpenRouter. Caching the big static system
+        # prompt removes it from prefill on repeat calls → lower latency, same quality.
+        self._supports_cache = name == "openrouter"
         self._base_url = base_url
         self._client = AsyncOpenAI(
             api_key=api_key,
@@ -72,6 +77,8 @@ class OpenAICompatProvider(LLMProvider):
     # ----- helpers -----
     def _encode_message(self, m: dict[str, Any]) -> dict[str, Any]:
         content = m.get("content")
+        # Mark this message's text as a prompt-cache breakpoint (OpenRouter only).
+        cache = bool(m.get("cache")) and self._supports_cache
         if isinstance(content, list):
             blocks: list[dict[str, Any]] = []
             for b in content:
@@ -89,5 +96,14 @@ class OpenAICompatProvider(LLMProvider):
                             },
                         }
                     )
+            if cache and blocks and blocks[-1].get("type") == "text":
+                blocks[-1]["cache_control"] = {"type": "ephemeral"}
             return {"role": m["role"], "content": blocks}
+        if cache and content:
+            return {
+                "role": m["role"],
+                "content": [
+                    {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+                ],
+            }
         return {"role": m["role"], "content": content or ""}

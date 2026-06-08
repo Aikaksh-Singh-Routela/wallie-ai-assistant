@@ -212,6 +212,10 @@ class OrchestratorConfig(BaseModel):
     summarize_every_n: int = 14
     max_messages: int = 200
     max_chars: int = 60000
+    # Cap how many recent turns are actually SENT to the LLM each call (0 = no cap).
+    # The rolling summary already carries older context, so trimming the verbatim
+    # tail cuts prompt prefill → lower latency, with minimal continuity loss.
+    llm_history_messages: int = 0
 
     organic_enabled: bool = True
     silence_beat_min_sec: float = 2.0

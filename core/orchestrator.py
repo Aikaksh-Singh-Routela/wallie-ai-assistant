@@ -841,7 +841,10 @@ class Orchestrator:
             topic_drift_style=self._cfg.topics.drift_style,
             allow_vision_skip=self._cfg.llm.allow_vision_skip,
         )
-        provider_msgs = self._conv.to_provider_messages(system_prompt)
+        provider_msgs = self._conv.to_provider_messages(
+            system_prompt,
+            max_history_messages=self._cfg.orchestrator.llm_history_messages,
+        )
 
         max_tok = self._cfg.llm.max_tokens
         if intent.kind == "outro":

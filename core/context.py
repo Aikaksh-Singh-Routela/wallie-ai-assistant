@@ -126,19 +126,28 @@ class Conversation:
             total -= len(self._messages.pop(i).content)
 
     def to_provider_messages(
-        self, system_prompt: str, *, max_images: int = 4
+        self, system_prompt: str, *, max_images: int = 4, max_history_messages: int = 0
     ) -> list[dict[str, Any]]:
+        # Only the conversational turns; the system prompt is added separately below.
+        msgs = [m for m in self._messages if m.role != "system"]
+        # Optionally trim the verbatim tail actually sent to the LLM. Older context
+        # still lives in the rolling summary (session_notes), so this cuts prefill
+        # latency with minimal continuity loss.
+        if max_history_messages and max_history_messages > 0:
+            msgs = msgs[-max_history_messages:]
+
         image_budget = max_images
         keep_images: set[int] = set()
-        for i in range(len(self._messages) - 1, -1, -1):
-            if self._messages[i].images and image_budget > 0:
+        for i in range(len(msgs) - 1, -1, -1):
+            if msgs[i].images and image_budget > 0:
                 keep_images.add(i)
                 image_budget -= 1
 
-        out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-        for i, m in enumerate(self._messages):
-            if m.role == "system":
-                continue
+        # The system prompt is the large, mostly-static prefix on every call.
+        # Flag it as a prompt-cache breakpoint; providers that support caching
+        # (via OpenAICompat/OpenRouter) skip re-processing it → lower latency.
+        out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt, "cache": True}]
+        for i, m in enumerate(msgs):
             if m.images and i in keep_images:
                 blocks: list[dict[str, Any]] = [{"type": "text", "text": m.content}]
                 for img in m.images:
