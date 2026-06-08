@@ -15,6 +15,7 @@ from audio import AudioPlayer
 from chat import ChatManager, ChatMessage
 from config import AppConfig, Runtime
 from core.context import Conversation, ImageBlock, pick_topic
+from core.highlights import HighlightTracker
 from core.persona import Persona
 from llm import LLMProvider
 from tts import TTSProvider
@@ -73,6 +74,11 @@ class Orchestrator:
         self._vision_ready_at: float = 0.0
         self._avatar = avatar
         self._memory = memory_store
+        self._highlights = HighlightTracker(
+            self._cfg.profile_name or "default",
+            enabled=self._cfg.orchestrator.auto_highlight,
+            threshold=self._cfg.orchestrator.highlight_threshold,
+        )
         self._hearing_loop = hearing_loop
         self._hearing_queue = hearing_queue
         self._latest_heard: str = ""       # most recent transcript Wallie "hears"
@@ -162,6 +168,7 @@ class Orchestrator:
         if self._hearing_loop:
             self._hearing_loop.start()
             logger.info("orchestrator: hearing started")
+        self._highlights.start()
         self._main_task = asyncio.create_task(self._run(), name="orchestrator")
         d = self._cfg.orchestrator.session_duration_min
         if d > 0:
@@ -185,6 +192,7 @@ class Orchestrator:
             await self._hearing_loop.stop()
         if self._chat:
             await self._chat.stop()
+        self._highlights.stop()
         self._player.close()
         await self._llm.aclose()
         await self._tts.aclose()
@@ -1005,6 +1013,16 @@ class Orchestrator:
             self._conv.add_assistant(full, source=intent.kind)
             self._last_spoken = full
             self._last_intent_kind = intent.kind
+            # Auto-highlight: flag this segment if it's clip-worthy (opt-in).
+            _react = intent.kind
+            if getattr(intent, "vision_directive", None) is not None:
+                try:
+                    _react = intent.vision_directive.reaction.value
+                except Exception:
+                    pass
+            self._highlights.note(
+                text=full, arousal=getattr(self._mood, "arousal", 0.0), reaction=_react
+            )
             if intent.kind != "vision":
                 self._last_monologue_spoken = full
             # Update continuity trackers AFTER each spoken segment.

@@ -32,3 +32,6 @@ claude-design-v2/
 
 # Landing page (deployed separately on Netlify)
 site/
+
+# Auto-highlight session markers
+highlights/
