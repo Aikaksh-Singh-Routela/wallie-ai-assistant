@@ -120,7 +120,7 @@ class LLMConfig(BaseModel):
 
 
 class TTSConfig(BaseModel):
-    provider: Literal["fish", "elevenlabs", "piper"] = "fish"
+    provider: Literal["fish", "elevenlabs", "piper", "kokoro"] = "fish"
     voice_id: str = ""
     sample_rate: int = 24000
     el_model_id: str = "eleven_turbo_v2_5"
@@ -133,6 +133,11 @@ class TTSConfig(BaseModel):
     fish_chunk_length: int = 100
     piper_model_path: str = ""
     piper_length_scale: float = 1.0
+    # Kokoro — local, high-quality neural TTS (free, runs on CPU/GPU). voice e.g.
+    # af_heart / am_adam / bf_emma; lang_code 'a'=US English, 'b'=UK. speed 0.5-2.0.
+    kokoro_voice: str = "af_heart"
+    kokoro_lang_code: str = "a"
+    kokoro_speed: float = 1.0
 
 
 class VisionConfig(BaseModel):
@@ -216,6 +221,10 @@ class OrchestratorConfig(BaseModel):
     # The rolling summary already carries older context, so trimming the verbatim
     # tail cuts prompt prefill → lower latency, with minimal continuity loss.
     llm_history_messages: int = 0
+    # Auto-highlight: while streaming, flag Wallie's most clip-worthy moments to a
+    # per-session JSONL in highlights/ so you can cut Shorts without scrubbing.
+    auto_highlight: bool = False
+    highlight_threshold: float = 0.55
 
     organic_enabled: bool = True
     silence_beat_min_sec: float = 2.0

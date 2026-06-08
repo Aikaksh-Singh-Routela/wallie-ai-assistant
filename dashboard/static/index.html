@@ -325,6 +325,7 @@
             <button :class="{on: cfg.tts.provider==='fish'}" @click="cfg.tts.provider='fish'">Fish Audio</button>
             <button :class="{on: cfg.tts.provider==='elevenlabs'}" @click="cfg.tts.provider='elevenlabs'">ElevenLabs</button>
             <button :class="{on: cfg.tts.provider==='piper'}" @click="cfg.tts.provider='piper'">Piper (local · free)</button>
+            <button :class="{on: cfg.tts.provider==='kokoro'}" @click="cfg.tts.provider='kokoro'">Kokoro (local · free)</button>
           </div>
         </div>
         <div class="field">
@@ -385,6 +386,31 @@
             <label>Speed (length scale) <span class="slider-val" x-text="cfg.tts.piper_length_scale.toFixed(2)"></span></label>
             <input type="range" min="0.6" max="1.6" step="0.05" x-model.number="cfg.tts.piper_length_scale" />
             <small class="hint">1.0 = normal · &lt;1 faster · &gt;1 slower</small>
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='kokoro'">
+          <div class="field wide">
+            <label>Kokoro voice</label>
+            <input x-model="cfg.tts.kokoro_voice" placeholder="af_heart" />
+            <small class="hint">
+              e.g. <code>af_heart</code>, <code>af_bella</code>, <code>am_adam</code>, <code>bf_emma</code> (a=US, b=UK · f=female, m=male).
+              Needs: <code>pip install kokoro soundfile</code> (uses PyTorch). No API key.
+            </small>
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='kokoro'">
+          <div class="field">
+            <label>Language</label>
+            <div class="segmented">
+              <button :class="{on: cfg.tts.kokoro_lang_code==='a'}" @click="cfg.tts.kokoro_lang_code='a'">US English</button>
+              <button :class="{on: cfg.tts.kokoro_lang_code==='b'}" @click="cfg.tts.kokoro_lang_code='b'">UK English</button>
+            </div>
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='kokoro'">
+          <div class="field">
+            <label>Speed <span class="slider-val" x-text="cfg.tts.kokoro_speed.toFixed(2)"></span></label>
+            <input type="range" min="0.5" max="2.0" step="0.05" x-model.number="cfg.tts.kokoro_speed" />
           </div>
         </template>
       </div>

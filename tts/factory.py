@@ -52,4 +52,15 @@ def build_tts(cfg: TTSConfig, secrets: Secrets) -> TTSProvider:
             length_scale=cfg.piper_length_scale,
         )
 
+    if cfg.provider == "kokoro":
+        try:
+            from .kokoro import KokoroTTS
+        except ModuleNotFoundError as e:
+            raise _missing_pkg("kokoro", "kokoro soundfile") from e
+        return KokoroTTS(
+            voice=cfg.kokoro_voice,
+            lang_code=cfg.kokoro_lang_code,
+            speed=cfg.kokoro_speed,
+        )
+
     raise TTSError(f"Unknown TTS provider: {cfg.provider}")
