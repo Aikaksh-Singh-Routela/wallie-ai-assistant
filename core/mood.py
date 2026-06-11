@@ -127,6 +127,27 @@ class MoodEngine:
         self._state.focus = min(1.0, self._state.focus + 0.04)
         self._retag()
 
+    def on_music(self, valence: float, arousal: float, energy: float = 0.0,
+                 *, strength: float = 1.0) -> None:
+        """Music in the room pulls Wallie's mood toward its emotional pole. Applied
+        each time a fresh music window is heard; the slow baseline decay in tick()
+        means a track has to keep playing to hold the mood there — so a long sad song
+        genuinely settles the streamer down, and a banger lifts it up, but a one-off
+        window doesn't whiplash the state. Gentle, continuous, organic."""
+        kv = 0.14 * strength
+        ka = 0.11 * strength
+        # pull toward the music's valence/arousal (not just add) → bounded, stable
+        self._state.valence += (valence - self._state.valence) * kv
+        self._state.arousal += (arousal - self._state.arousal) * ka
+        # loud, energetic music makes it want to talk/hype; mellow music quiets it
+        if energy >= 0.45 and arousal >= 0.55:
+            self._state.talkativity = min(1.0, self._state.talkativity + 0.04 * strength)
+        elif arousal < 0.35:
+            self._state.talkativity = max(0.0, self._state.talkativity - 0.03 * strength)
+        self._state.valence = max(-1.0, min(1.0, self._state.valence))
+        self._state.arousal = _clip01(self._state.arousal)
+        self._retag()
+
     def on_boring_stretch(self) -> None:
         self._state.arousal = max(0.0, self._state.arousal - 0.04)
         self._state.talkativity = max(0.0, self._state.talkativity - 0.03)

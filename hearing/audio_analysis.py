@@ -19,9 +19,26 @@ no-dependency baseline.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
-# Krumhansl–Kessler tonal hierarchy profiles (relative weight of each scale degree).
+
+@dataclass
+class MusicFeatures:
+    """A musical window distilled into one descriptor PLUS the numbers that let it
+    move Wallie's mood (not just the prompt). valence/arousal/energy/brightness are
+    the perceptual axes the MoodEngine reads."""
+    descriptor: str          # "slow, melancholic, minor-key, acoustic"
+    valence: float           # -1..1  (minor/dark/harsh = negative, major/bright = positive)
+    arousal: float           # 0..1   (tempo + pulse + loudness + brightness)
+    energy: float            # 0..1   (loudness / RMS)
+    brightness: float        # 0..1   (spectral centroid)
+    mode: str                # "major"|"minor"|"neutral"
+    clarity: float           # 0..1   how tonal / confident the key read is
+    bpm: float
+    pulse: float             # 0..1   beat strength
+
 _MAJOR_PROFILE = np.array(
     [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
 )
@@ -30,7 +47,6 @@ _MINOR_PROFILE = np.array(
 )
 
 
-# ----------------------------------------------------------------------------- DSP
 def _stft_mag(audio: "np.ndarray", n_fft: int = 2048, hop: int = 512) -> "np.ndarray":
     """Magnitude STFT, shape [frames, bins]. Cheap, vectorized."""
     if audio.size < n_fft:
@@ -159,7 +175,6 @@ def _mood_word(mode: str, clarity: float, bpm: float, rms: float, centroid: floa
         return "tender" if centroid >= 1500 else "warm"
     if pos:
         return "upbeat"
-    # tonality unclear — fall back to arousal/brightness only.
     if high:
         return "driving"
     if low:
@@ -202,18 +217,50 @@ def _texture_word(bands: dict, pulse: float, clarity: float, flatness: float) ->
     return "full"
 
 
-# ----------------------------------------------------------------------------- public
-def music_character(audio: "np.ndarray", sr: int = 16000) -> str:
-    """Rich, coherent, emotionally-aware description of a musical window.
+def _valence_arousal(mode: str, clarity: float, bpm: float, pulse: float,
+                     rms: float, centroid: float, production: str,
+                     dyn: str) -> tuple[float, float, float, float]:
+    """Map raw DSP cues → (valence -1..1, arousal 0..1, energy 0..1, brightness 0..1).
+    This is what lets music actually shift Wallie's mood instead of just the prompt."""
+    brightness = float(np.clip(centroid / 3800.0, 0.0, 1.0))
+    energy = float(np.clip(rms / 0.18, 0.0, 1.0))
+    tonal = float(np.clip((clarity - 0.28) / 0.45, 0.0, 1.0))
 
-    e.g. "slow, melancholic, minor-key, acoustic" / "fast, euphoric, major-key, dense".
-    Empty string if there's basically nothing to describe.
-    """
+    valence = 0.0
+    if mode == "major":
+        valence += 0.62 * tonal
+    elif mode == "minor":
+        valence -= 0.62 * tonal
+    valence += (brightness - 0.5) * 0.32           # brighter timbre reads happier
+    if production in ("harsh", "muddy"):
+        valence -= 0.12                            # a bad mix sours the vibe
+    if dyn == "building":
+        valence += 0.08
+    elif dyn == "fading":
+        valence -= 0.06
+    valence = float(np.clip(valence, -1.0, 1.0))
+
+    has_beat = pulse > 0.15 and bpm > 0
+    arousal = 0.22
+    arousal += energy * 0.42
+    arousal += pulse * 0.26
+    if has_beat:
+        arousal += float(np.clip(bpm / 170.0, 0.0, 1.0)) * 0.22
+    arousal += brightness * 0.14
+    if dyn == "building":
+        arousal += 0.08
+    arousal = float(np.clip(arousal, 0.0, 1.0))
+    return valence, arousal, energy, brightness
+
+
+def analyze_music(audio: "np.ndarray", sr: int = 16000) -> "MusicFeatures | None":
+    """Full musical read of a window: descriptor + the numeric mood axes. None if
+    there's nothing musical to describe."""
     if audio is None or audio.size < sr // 2:
-        return ""
+        return None
     rms = float(np.sqrt(np.mean(audio ** 2)))
     if rms <= 0:
-        return ""
+        return None
     peak = float(np.abs(audio).max())
 
     hop = 512
@@ -228,9 +275,9 @@ def music_character(audio: "np.ndarray", sr: int = 16000) -> str:
     bpm, pulse = _tempo_pulse(stft, sr, hop)
     bands = _band_energy(avg_spec, freqs)
     dyn = _dynamics(audio)
+    production = _production_word(bands, flatness, peak, pulse)
 
     parts: list[str] = []
-    # Tempo (only when there's an actual pulse worth naming).
     if pulse > 0.18:
         if bpm >= 120:
             parts.append("fast")
@@ -238,26 +285,33 @@ def music_character(audio: "np.ndarray", sr: int = 16000) -> str:
             parts.append("slow")
     elif bpm and bpm <= 75:
         parts.append("slow")
-    # Emotional read (the heart of it).
     parts.append(_mood_word(mode, clarity, bpm, rms, centroid))
-    # Tonality, when confident.
     if clarity >= 0.32 and mode in ("major", "minor"):
         parts.append(f"{mode}-key")
-    # Texture / instrumentation.
     parts.append(_texture_word(bands, pulse, clarity, flatness))
-    # Production / mix quality (material for a good/bad verdict).
-    parts.append(_production_word(bands, flatness, peak, pulse))
-    # Dynamics, only when it's saying something interesting.
+    parts.append(production)
     if dyn in ("building", "fading", "dynamic", "sparse"):
         parts.append(dyn)
 
-    # De-dupe while preserving order, cap length so it stays punchy.
     seen, out = set(), []
     for p in parts:
         if p and p not in seen:
             seen.add(p)
             out.append(p)
-    return ", ".join(out[:5])
+    descriptor = ", ".join(out[:5])
+
+    valence, arousal, energy, brightness = _valence_arousal(
+        mode, clarity, bpm, pulse, rms, centroid, production, dyn)
+    return MusicFeatures(descriptor=descriptor, valence=valence, arousal=arousal,
+                         energy=energy, brightness=brightness, mode=mode,
+                         clarity=clarity, bpm=bpm, pulse=pulse)
+
+
+def music_character(audio: "np.ndarray", sr: int = 16000) -> str:
+    """Backward-compatible text descriptor (e.g. 'slow, melancholic, minor-key,
+    acoustic'). Empty string if there's nothing musical to describe."""
+    f = analyze_music(audio, sr)
+    return f.descriptor if f else ""
 
 
 def analyze_window(audio: "np.ndarray", sr: int = 16000, *,
@@ -280,9 +334,6 @@ def analyze_window(audio: "np.ndarray", sr: int = 16000, *,
     freqs = np.fft.rfftfreq(len(audio), 1.0 / sr)
     flatness = float(np.exp(np.mean(np.log(spec))) / np.mean(spec))
 
-    # Music has tonal structure: a few pitch classes dominate, so the chroma is peaky
-    # and a key correlates. Real (recorded, slightly noisy) music sits well above pure
-    # tones in flatness, so flatness alone misses it — lean on the harmonic cues.
     chroma = _chroma(spec, freqs)
     chroma_peak = float(chroma.max() / (chroma.mean() + 1e-9)) if chroma.sum() > 0 else 0.0
     _mode, clarity = _estimate_tonality(chroma)

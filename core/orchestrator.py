@@ -701,6 +701,11 @@ class Orchestrator:
                 break
         if latest is None:
             return
+        # Music FEELS its way into the mood, even when Wallie stays quiet: a fresh
+        # musical window nudges arousal/valence toward the track's emotional pole.
+        if getattr(latest, "is_music", False):
+            self._mood.on_music(latest.music_valence, latest.music_arousal,
+                                latest.music_energy)
         heard = ""
         if latest.sound_type == "speech" and latest.transcript:
             if self._is_self_echo(latest.transcript):
