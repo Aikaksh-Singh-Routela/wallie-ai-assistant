@@ -683,6 +683,51 @@
       </div>
     </section>
 
+    <!-- ============ PLAY (MINECRAFT) ============ -->
+    <section x-show="section==='play'" class="section">
+      <header class="section-head">
+        <h2>Play — Minecraft 🎮</h2>
+        <p>Wallie actually PLAYS Minecraft and reacts in character. When this is ON, the commentary is grounded in what Wallie is really doing (not guessing from the screen). When OFF, standard Vision mode runs as usual.</p>
+      </header>
+
+      <label class="toggle-row big">
+        <span>Enable Play mode</span>
+        <input type="checkbox" class="switch" x-model="cfg.play.enabled" />
+      </label>
+
+      <div x-show="cfg.play.enabled">
+        <div class="field">
+          <label>What should Wallie do? (goal)</label>
+          <textarea rows="3" x-model="cfg.play.goal" placeholder="Build a base, gear up, explore…"></textarea>
+          <small class="hint">The playing brain pursues this. Keep it open-ended for an entertaining show.</small>
+        </div>
+
+        <label class="toggle-row">
+          <span>Commentary from the playing brain <small class="hint">(grounded, no screen hallucination)</small></span>
+          <input type="checkbox" class="switch" x-model="cfg.play.talk_from_agent" />
+        </label>
+        <label class="toggle-row">
+          <span>Hide in-game chat & bot commands <small class="hint">(clean stream)</small></span>
+          <input type="checkbox" class="switch" x-model="cfg.play.hide_chat" />
+        </label>
+        <label class="toggle-row">
+          <span>Keep out of water (open-ground play)</span>
+          <input type="checkbox" class="switch" x-model="cfg.play.avoid_water" />
+        </label>
+
+        <div class="setup-card" style="margin-top:16px;">
+          <h3>One-click setup</h3>
+          <p class="hint">Installs Fabric + the mods Wallie needs (Fabric API, Meteor, Baritone, smooth-cam) into your <code>.minecraft</code>. Backs up your current mods first. Needs Java 21+.</p>
+          <div class="btn-row">
+            <button class="btn" :disabled="playBusy" @click="installMinecraft()">⬇ Install Minecraft mods</button>
+            <button class="btn primary" :disabled="playBusy || !cfg.play.enabled" @click="launchPlay()">▶ Launch Wallie Play</button>
+          </div>
+          <pre x-show="playLog" x-text="playLog" class="play-log" style="white-space:pre-wrap;max-height:220px;overflow:auto;margin-top:12px;padding:10px;background:#0d0d12;border-radius:8px;font-size:12px;"></pre>
+          <small class="hint">After install: open the Minecraft launcher, pick the <b>fabric-loader-1.21.11</b> profile, join a survival world, then hit <b>Launch Wallie Play</b> and focus the game. <b>F8</b> stops it.</small>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ HEARING ============ -->
     <section x-show="section==='hearing'" class="section">
       <header class="section-head">

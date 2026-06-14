@@ -40,25 +40,43 @@ class SystemAudioCapture:
         self._thread.start()
 
     def _capture_loop(self) -> None:
-        spk = sc.default_speaker()
-        mic = sc.get_microphone(str(spk.name), include_loopback=True)
-        chunk = max(1, int(self._sr * 0.25))  # drain in 250 ms slices
-        with mic.recorder(samplerate=self._sr, channels=self._ch, blocksize=chunk) as rec:
-            while self._running:
+        # soundcard's WASAPI/MediaFoundation backend uses COM, which must be initialized
+        # on THIS thread. The dashboard starts us from a worker thread where it isn't,
+        # so without this soundcard raises 0x800401f0 (CO_E_NOTINITIALIZED) and the ear dies.
+        _co_done = False
+        try:
+            from ctypes import windll
+            hr = windll.ole32.CoInitialize(None)
+            _co_done = hr in (0, 1)  # S_OK / S_FALSE both need a matching CoUninitialize
+        except Exception:  # noqa: BLE001 — non-Windows or no COM; soundcard may still work
+            _co_done = False
+        try:
+            spk = sc.default_speaker()
+            mic = sc.get_microphone(str(spk.name), include_loopback=True)
+            chunk = max(1, int(self._sr * 0.25))  # drain in 250 ms slices
+            with mic.recorder(samplerate=self._sr, channels=self._ch, blocksize=chunk) as rec:
+                while self._running:
+                    try:
+                        data = rec.record(numframes=chunk)
+                    except Exception:
+                        break
+                    data = data.flatten().astype("float32")
+                    n = data.shape[0]
+                    if n == 0:
+                        continue
+                    with self._lock:
+                        if n >= self._ring.shape[0]:
+                            self._ring[:] = data[-self._ring.shape[0]:]
+                        else:
+                            self._ring[:-n] = self._ring[n:]
+                            self._ring[-n:] = data
+        finally:
+            if _co_done:
                 try:
-                    data = rec.record(numframes=chunk)
-                except Exception:
-                    break
-                data = data.flatten().astype("float32")
-                n = data.shape[0]
-                if n == 0:
-                    continue
-                with self._lock:
-                    if n >= self._ring.shape[0]:
-                        self._ring[:] = data[-self._ring.shape[0]:]
-                    else:
-                        self._ring[:-n] = self._ring[n:]
-                        self._ring[-n:] = data
+                    from ctypes import windll
+                    windll.ole32.CoUninitialize()
+                except Exception:  # noqa: BLE001
+                    pass
 
     def latest(self, seconds: float) -> "np.ndarray":
         """Most recent `seconds` of audio from the ring (always current)."""

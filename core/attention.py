@@ -52,6 +52,7 @@ class AttentionEngine:
         ignore_base: float = 0.27,
         silence_base: float = 0.18,
         min_vision_react_interval: float = 15.0,
+        active_content_boost: float = 1.0,
         seed: Optional[int] = None,
     ) -> None:
         self._organicity = max(0.0, min(1.0, organicity))
@@ -61,6 +62,7 @@ class AttentionEngine:
         self._ignore_base = ignore_base
         self._silence_base = silence_base
         self._min_vision_react_interval = min_vision_react_interval
+        self._active_content_boost = max(0.0, min(1.0, active_content_boost))
         self._rng = random.Random(seed)
         self._state = _AttentionState()
 
@@ -197,20 +199,22 @@ class AttentionEngine:
             w_deep *= 0.2
             w_glance *= 0.5
         elif screen_activity == "app_switch":
-            w_deep *= 1.6
-            w_glance *= 1.4
-            w_ignore *= 0.35
-            w_silence *= 0.6
+            acb = self._active_content_boost
+            w_deep *= 1.0 + 0.6 * acb
+            w_glance *= 1.0 + 0.4 * acb
+            w_ignore *= 1.0 - 0.65 * acb
+            w_silence *= 1.0 - 0.4 * acb
         elif screen_activity == "navigation":
             w_glance *= 1.3
             w_deep *= 0.9
             w_tangent *= 1.1
         elif screen_activity == "media":
-            w_deep *= 1.10
-            w_glance *= 1.20
-            w_ignore *= 0.65
-            w_silence *= 0.75
-            w_tangent *= 1.05
+            acb = self._active_content_boost
+            w_deep *= 1.0 + 0.10 * acb
+            w_glance *= 1.0 + 0.20 * acb
+            w_ignore *= 1.0 - 0.35 * acb
+            w_silence *= 1.0 - 0.25 * acb
+            w_tangent *= 1.0 + 0.05 * acb
 
         if rapid_browsing:
             w_ignore *= 2.0

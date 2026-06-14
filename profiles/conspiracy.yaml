@@ -95,8 +95,8 @@ persona:
   - the night he realized the moon was a lens
   personal_beat_rate: 0.3
 llm:
-  provider: openrouter
-  model: google/gemini-2.5-flash
+  provider: groq
+  model: meta-llama/llama-4-scout-17b-16e-instruct
   temperature: 0.95
   top_p: 0.95
   max_tokens: 400
@@ -141,6 +141,14 @@ vision:
   idle_check_interval_sec: 30.0
   min_engagement_for_react: 0.3
   startup_delay_sec: 5.0
+hearing:
+  enabled: false
+  window_sec: 5.0
+  model_size: small
+  language: ''
+  silence_threshold: 0.006
+  sound_event_threshold: 0.06
+  max_context_age_sec: 12.0
 chat:
   youtube_enabled: false
   twitch_enabled: false

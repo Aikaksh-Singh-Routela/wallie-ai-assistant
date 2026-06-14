@@ -101,6 +101,11 @@ persona:
   - getting lost for an hour 50 blocks from base
   - his first ever Ender Dragon kill
   personal_beat_rate: 0.3
+  conversational: false
+  reveal_ai: false
+  plug_url: ''
+  plug_rate: 0.15
+  initiates: false
 llm:
   provider: groq
   model: meta-llama/llama-4-scout-17b-16e-instruct
@@ -117,6 +122,7 @@ tts:
   provider: fish
   voice_id: 4ee64f72cce74ce98fbac23a998f9169
   sample_rate: 24000
+  output_device: ''
   el_model_id: eleven_turbo_v2_5
   el_stability: 0.45
   el_similarity_boost: 0.75
@@ -125,6 +131,9 @@ tts:
   fish_chunk_length: 100
   piper_model_path: ''
   piper_length_scale: 1.0
+  kokoro_voice: af_heart
+  kokoro_lang_code: a
+  kokoro_speed: 1.0
 vision:
   enabled: true
   source: monitor
@@ -148,6 +157,20 @@ vision:
   idle_check_interval_sec: 30.0
   min_engagement_for_react: 0.3
   startup_delay_sec: 5.0
+hearing:
+  enabled: true
+  window_sec: 5.0
+  model_size: small
+  language: ''
+  silence_threshold: 0.006
+  sound_event_threshold: 0.06
+  max_context_age_sec: 12.0
+  reply_gate_sec: 6.0
+  vad_segmentation: false
+  poll_interval_sec: 0.3
+  end_silence_sec: 0.6
+  max_utterance_sec: 12.0
+  low_latency: false
 chat:
   youtube_enabled: false
   twitch_enabled: false
@@ -176,6 +199,9 @@ orchestrator:
   summarize_every_n: 14
   max_messages: 200
   max_chars: 60000
+  llm_history_messages: 0
+  auto_highlight: false
+  highlight_threshold: 0.55
   organic_enabled: true
   silence_beat_min_sec: 1.5
   silence_beat_max_sec: 4.0

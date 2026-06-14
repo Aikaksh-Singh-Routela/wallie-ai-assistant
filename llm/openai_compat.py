@@ -1,12 +1,21 @@
 """OpenAI-compatible provider — covers OpenAI, Groq, and OpenRouter."""
 from __future__ import annotations
 
+import asyncio
 import base64
 from typing import Any, AsyncIterator
 
+from loguru import logger
 from openai import AsyncOpenAI
 
 from .base import LLMError, LLMProvider
+
+# A live stream can't afford a hung LLM call: bound every request and retry a couple
+# of times on transient blips (connection drops, 5xx, malformed SSE) so one hiccup
+# doesn't turn into dead air. Kept short because reactions must stay snappy.
+_REQUEST_TIMEOUT_SEC = 25.0
+_MAX_ATTEMPTS = 3
+_BACKOFF_BASE_SEC = 0.4
 
 
 class OpenAICompatProvider(LLMProvider):
@@ -35,6 +44,8 @@ class OpenAICompatProvider(LLMProvider):
             api_key=api_key,
             base_url=base_url,
             default_headers=extra_headers or None,
+            timeout=_REQUEST_TIMEOUT_SEC,  # fail fast instead of hanging for minutes
+            max_retries=0,                 # we do our own (stream-aware) retry below
         )
 
     async def stream(
@@ -48,28 +59,42 @@ class OpenAICompatProvider(LLMProvider):
         frequency_penalty: float = 0.0,
     ) -> AsyncIterator[str]:
         payload = [self._encode_message(m) for m in messages]
-        try:
-            stream = await self._client.chat.completions.create(
-                model=self.model,
-                messages=payload,
-                temperature=temperature,
-                top_p=top_p,
-                max_tokens=max_tokens,
-                presence_penalty=presence_penalty,
-                frequency_penalty=frequency_penalty,
-                stream=True,
-            )
-        except Exception as e:
-            raise LLMError(f"{self.name} request failed: {e}") from e
-
-        async for event in stream:
+        last_err: Exception | None = None
+        for attempt in range(_MAX_ATTEMPTS):
+            produced = False
             try:
-                delta = event.choices[0].delta
-                chunk = getattr(delta, "content", None)
-            except (IndexError, AttributeError):
-                chunk = None
-            if chunk:
-                yield chunk
+                stream = await self._client.chat.completions.create(
+                    model=self.model,
+                    messages=payload,
+                    temperature=temperature,
+                    top_p=top_p,
+                    max_tokens=max_tokens,
+                    presence_penalty=presence_penalty,
+                    frequency_penalty=frequency_penalty,
+                    stream=True,
+                )
+                async for event in stream:
+                    try:
+                        delta = event.choices[0].delta
+                        chunk = getattr(delta, "content", None)
+                    except (IndexError, AttributeError):
+                        chunk = None
+                    if chunk:
+                        produced = True
+                        yield chunk
+                return  # completed cleanly
+            except Exception as e:  # noqa: BLE001 — connection drop, 5xx, malformed SSE…
+                last_err = e
+                # If we already streamed part of the answer, restarting would duplicate
+                # text — bail. Otherwise retry a couple of times before giving up.
+                if produced or attempt == _MAX_ATTEMPTS - 1:
+                    break
+                logger.warning(
+                    f"{self.name}: transient LLM error (try {attempt + 1}/{_MAX_ATTEMPTS}), "
+                    f"retrying: {str(e)[:120]}"
+                )
+                await asyncio.sleep(_BACKOFF_BASE_SEC * (2 ** attempt))
+        raise LLMError(f"{self.name} request failed: {last_err}") from last_err
 
     async def aclose(self) -> None:
         await self._client.close()

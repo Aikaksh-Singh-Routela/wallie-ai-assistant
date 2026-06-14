@@ -101,6 +101,28 @@ class PersonaConfig(BaseModel):
     anecdote_seeds: list[str] = Field(default_factory=list)
     personal_beat_rate: float = 0.35
 
+    # --- Conversational / companion mode (e.g. VRChat) ---
+    # When true, Wallie talks WITH people in a real-time back-and-forth instead of
+    # hosting a show: short turns, replies to what the other person actually said,
+    # no audience/monologue framing.
+    conversational: bool = False
+    reveal_ai: bool = False          # openly an AI; owns it, can joke about it
+    plug_url: str = ""               # soft self-plug (e.g. github) when someone's curious
+    plug_rate: float = 0.15          # 0 = never bring it up unprompted; higher = more readily
+
+    # --- Feeling alive: intent + memory ---
+    # An ongoing goal/objective the character pursues this session (a "through-line").
+    # Gives the stream a spine instead of pure moment-to-moment reactions. Rotates so
+    # the session has chapters. Empty = no explicit goal.
+    session_goals: list[str] = Field(default_factory=list)
+    goal_rotate_sec: float = 600.0   # advance to the next goal every N sec (0 = never rotate)
+    # Encourage natural callbacks to earlier moments/takes from this session.
+    enable_callbacks: bool = True
+    # When conversational + vision is on: Wallie may START conversations on its own —
+    # if it sees someone it could talk to, it opens with a greeting/line instead of
+    # only ever waiting to be spoken to.
+    initiates: bool = False
+
 
 # -------------------------------------------------------------------
 # Other subsystems
@@ -123,6 +145,9 @@ class TTSConfig(BaseModel):
     provider: Literal["fish", "elevenlabs", "piper", "kokoro"] = "fish"
     voice_id: str = ""
     sample_rate: int = 24000
+    # Output device for Wallie's voice. "" = system default. Accepts a device index
+    # or a name substring, e.g. "CABLE Input" to route TTS into VRChat via VB-CABLE.
+    output_device: str = ""
     el_model_id: str = "eleven_turbo_v2_5"
     el_stability: float = 0.45
     el_similarity_boost: float = 0.75
@@ -164,6 +189,22 @@ class VisionConfig(BaseModel):
     idle_check_interval_sec: float = 45.0
     min_engagement_for_react: float = 0.35
     startup_delay_sec: float = 5.0
+    # AttentionEngine reaction weights — how often a vision event becomes each kind of
+    # reaction. Lower deep/glance + higher ignore/silence = talks LESS (good for games
+    # where the whole screen changes constantly). Defaults match the engine's baseline.
+    react_deep_base: float = 0.22
+    react_glance_base: float = 0.28
+    react_tangent_base: float = 0.05
+    react_ignore_base: float = 0.27
+    react_silence_base: float = 0.18
+    # Scales the "fill the silence" fallback timer. >1 waits longer before narrating
+    # into quiet stretches (less ambient chatter); <1 fills dead air sooner.
+    silence_fallback_scale: float = 1.0
+    # How strongly the app_switch/media "active content" reaction boost applies.
+    # 1.0 = full boost (right for browsing, where switching apps is a real event).
+    # Lower it for FULLSCREEN GAMES, where every camera move looks like an app_switch
+    # and the boost makes the streamer over-talk. 0.0 = treat it like normal navigation.
+    active_content_boost: float = 1.0
 
 
 class HearingConfig(BaseModel):
@@ -176,6 +217,21 @@ class HearingConfig(BaseModel):
     silence_threshold: float = 0.006  # RMS below this = silence, skipped entirely
     sound_event_threshold: float = 0.06  # loud non-speech still emits a "sound" event
     max_context_age_sec: float = 12.0    # how long a heard line stays relevant for fusion
+    reply_gate_sec: float = 6.0          # min seconds between spoken reactions to heard audio
+                                         # (lower it for snappy two-way conversation, e.g. 1.5)
+    # --- Conversation latency / accuracy (two-way mode) ---
+    # VAD segmentation: instead of fixed `window_sec` slices, detect when the person
+    # starts and STOPS talking and transcribe the whole utterance the moment they pause.
+    # Replies land right after they finish (low latency) and full sentences aren't cut.
+    vad_segmentation: bool = False
+    poll_interval_sec: float = 0.3       # how often to check for voice activity
+    end_silence_sec: float = 0.6         # trailing silence that marks end-of-utterance
+    max_utterance_sec: float = 12.0      # safety cap on a single utterance
+    low_latency: bool = False            # fewer decode retries — faster, slightly less robust
+    # --- Robustness (accents, background TV, messy mics) ---
+    speech_only: bool = False            # dialogue only — never react to music / non-speech sound
+    beam_size: int = 5                   # Whisper beam width (higher = more accurate on accents/noise)
+    denoise: bool = False                # spectral noise reduction before STT (needs `noisereduce`)
 
 
 class ChatConfig(BaseModel):
@@ -308,6 +364,23 @@ class AvatarConfig(BaseModel):
     auto_map_expressions:  bool = True
 
 
+class PlayConfig(BaseModel):
+    """Minecraft Play mode — Wallie actually PLAYS the game (agent brain), and the streamer
+    commentary is grounded in what the agent is really doing instead of guessing from the screen.
+    When disabled, Wallie runs in standard vision mode (reacts to whatever is on screen)."""
+    enabled: bool = False
+    game: str = "minecraft"
+    goal: str = (
+        "Build a thriving Minecraft empire LIVE for an audience: gather and stockpile resources, "
+        "craft full armour and tool sets, build varied good-looking structures, fight, explore and "
+        "take on varied adventures. Progress toward the Ender Dragon over time, but keep the JOURNEY "
+        "entertaining — this is a show, NOT a speedrun."
+    )
+    talk_from_agent: bool = True      # commentary uses the agent's real actions/state, not the frame
+    hide_chat: bool = True            # hide in-game chat + Baritone commands on stream
+    avoid_water: bool = True          # keep Baritone out of water (open-ground play)
+
+
 class AppConfig(BaseModel):
     profile_name: str = "default"
     persona: PersonaConfig = Field(default_factory=PersonaConfig)
@@ -319,6 +392,7 @@ class AppConfig(BaseModel):
     topics: TopicConfig = Field(default_factory=TopicConfig)
     orchestrator: OrchestratorConfig = Field(default_factory=OrchestratorConfig)
     avatar: AvatarConfig = Field(default_factory=AvatarConfig)
+    play: PlayConfig = Field(default_factory=PlayConfig)
 
 
 # -------------------------------------------------------------------

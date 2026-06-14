@@ -22,6 +22,9 @@ tests/pytest-cache-files-*/
 .vs/
 *.swp
 *.swo
+client_secret.json
+token.json
+
 
 # Demo/trailer assets (not part of the project)
 wallie-trailer-remotion/
@@ -35,3 +38,23 @@ site/
 
 # Auto-highlight session markers
 highlights/
+
+# Agent / YOLO artifacts
+*.pt
+models/
+runs/
+dataset/
+diag_*.png
+wlabel_*.png
+
+debug/
+
+# Minecraft Play runtime state (regenerated at runtime)
+wallie_progress.json
+wallie_skills.json
+wallie_blocks.json
+wallie_state.json
+wallie_house.schem
+
+# Internal analysis (not product code)
+scripts/star_forecast.py

@@ -7,6 +7,7 @@ import os
 import random
 import secrets
 import socket
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -310,6 +311,39 @@ def _build_app(
         orch.resume_from_break()
         return {"ok": True}
 
+    # ---------- Minecraft Play mode ----------
+    _REPO = Path(__file__).resolve().parent.parent
+
+    @app.post("/api/play/install")
+    async def api_play_install() -> dict[str, Any]:
+        import asyncio as _aio
+        proc = await _aio.create_subprocess_exec(
+            sys.executable, str(_REPO / "scripts" / "install_minecraft.py"),
+            cwd=str(_REPO), stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.STDOUT,
+        )
+        try:
+            out, _ = await _aio.wait_for(proc.communicate(), timeout=300)
+        except _aio.TimeoutError:
+            proc.kill()
+            raise HTTPException(504, "Install timed out — check your connection and try again")
+        log = (out or b"").decode("utf-8", "ignore")
+        return {"ok": proc.returncode == 0, "log": log[-4000:]}
+
+    @app.post("/api/play/launch")
+    async def api_play_launch() -> dict[str, Any]:
+        import asyncio as _aio
+        cfg = load_profile()
+        if not cfg.play.enabled:
+            raise HTTPException(400, "Play mode is OFF — enable it in the Play section first")
+        if state.orchestrator and state.orchestrator.status().get("running"):
+            await state.orchestrator.stop()        # the live runner starts its own orchestrator
+            state.orchestrator = None
+        await _aio.create_subprocess_exec(
+            sys.executable, str(_REPO / "scripts" / "run_wallie_live.py"),
+            cfg.play.goal, cfg.profile_name, cwd=str(_REPO),
+        )
+        return {"ok": True, "msg": "Wallie Play launching — focus the Minecraft window. F8 stops it."}
+
     # ---------- memory endpoints ----------
     @app.get("/api/memory")
     def api_memory_get() -> dict[str, Any]:
@@ -603,7 +637,8 @@ def _build_app(
             return {"ok": True, "routed": "live-player"}
         from audio import AudioPlayer
         tts = build_tts(cfg.tts, Secrets())
-        player = AudioPlayer(sample_rate=tts.sample_rate, channels=tts.channels)
+        player = AudioPlayer(sample_rate=tts.sample_rate, channels=tts.channels,
+                             device=(cfg.tts.output_device or None))
         player.start()
         try:
             async for pcm in tts.synthesize(body.text):

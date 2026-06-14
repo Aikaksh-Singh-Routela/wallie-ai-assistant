@@ -30,7 +30,8 @@ def build_orchestrator(runtime: Optional[Runtime] = None) -> Orchestrator:
     persona = Persona.from_config(cfg.persona)
     llm = build_provider(cfg.llm, runtime.secrets)
     tts = build_tts(cfg.tts, runtime.secrets)
-    player = AudioPlayer(sample_rate=tts.sample_rate, channels=tts.channels)
+    player = AudioPlayer(sample_rate=tts.sample_rate, channels=tts.channels,
+                         device=(cfg.tts.output_device or None))
 
     chat_manager: Optional[ChatManager] = None
     

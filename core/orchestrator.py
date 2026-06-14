@@ -32,6 +32,7 @@ from vision.vision_memory import SceneMemory, UserBehaviorTracker
 from core.attention import AttentionEngine, VisionDirective, VisionReaction
 from core.mood import MoodEngine
 from core.memory_store import MemoryStore
+from core.live_activity import get_activity as _live_activity
 
 IntentKind = Literal["chat", "vision", "monologue", "outro", "hearing"]
 
@@ -112,6 +113,10 @@ class Orchestrator:
         self._outro_done: bool = False
         self._segments_since_summary: int = 0
         self._open_threads: list[str] = []
+        # Narrative spine: a rotating session goal the character pursues (feels alive).
+        self._current_goal: Optional[str] = None
+        self._goal_index: int = 0
+        self._goal_started_ts: float = 0.0
         self._recent_themes: list[str] = []
         self._phrase_uses: dict[str, int] = {}
         self._segments_ended_with_question: int = 0
@@ -124,6 +129,12 @@ class Orchestrator:
         self._attention = AttentionEngine(
             organicity=self._cfg.vision.organicity,
             min_vision_react_interval=self._cfg.vision.min_vision_react_interval_sec,
+            deep_base=self._cfg.vision.react_deep_base,
+            glance_base=self._cfg.vision.react_glance_base,
+            tangent_base=self._cfg.vision.react_tangent_base,
+            ignore_base=self._cfg.vision.react_ignore_base,
+            silence_base=self._cfg.vision.react_silence_base,
+            active_content_boost=self._cfg.vision.active_content_boost,
         )
         self._last_vision_turn_ts: float = 0.0
         self._consecutive_skips: int = 0
@@ -331,6 +342,50 @@ class Orchestrator:
             self._mood.on_highlight_chat()
             return Intent(kind="chat", chat=highlight, urgent=True)
 
+        # Conversational mode (e.g. VRChat): the person talking to you IS the priority.
+        # Reply fast, ahead of any vision reaction. Only on speech (not music/sound events,
+        # which _drain_hearing wraps in parentheses).
+        if self._cfg.persona.conversational and self._cfg.hearing.enabled:
+            heard = self._fresh_heard()
+            now_h = time.time()
+            is_speech = bool(heard) and not heard.startswith("(")
+            if (is_speech and heard != self._last_reacted_heard
+                    and now_h - self._last_hearing_turn_ts >= self._cfg.hearing.reply_gate_sec):
+                self._last_reacted_heard = heard
+                self._last_hearing_turn_ts = now_h
+                self._mood.on_scene_change()
+                return Intent(kind="hearing", heard=heard, urgent=True)
+
+        # PLAY MODE: when Wallie is playing (e.g. Minecraft), the commentary is grounded in the
+        # agent's REAL actions and runs on its own cadence — fully independent of the Vision toggle.
+        # So Play works even with Vision OFF, and Vision/Hearing/Play each switch on/off separately.
+        play = getattr(self._cfg, "play", None)
+        if play is not None and play.enabled and play.talk_from_agent and _live_activity():
+            if self._vision_loop is not None:
+                self._pop_latest_vision()            # drain so the loop can't back up; frame unused
+            now_t = time.time()
+            since_last_spoken = now_t - self._last_segment_spoken_ts
+            since_last_vision = now_t - self._last_vision_turn_ts if self._last_vision_turn_ts > 0 else 9999.0
+            hard_floor = self._cfg.vision.min_vision_react_interval_sec * 0.65
+            if (since_last_spoken >= self._target_silence_sec
+                    and since_last_vision >= hard_floor
+                    and self._mood.wants_vision_engagement() > 0.25):
+                roll = random.random()
+                if roll < 0.30:
+                    reaction, sentences = VisionReaction.DEEP, random.choice([2, 3, 3])
+                elif roll < 0.45:
+                    reaction, sentences = VisionReaction.TANGENT, random.choice([2, 2, 3])
+                else:
+                    reaction, sentences = VisionReaction.GLANCE, random.choice([1, 2, 2])
+                directive = VisionDirective(reaction=reaction, target_sentences=sentences,
+                                            rationale="play: grounded agent commentary", is_fallback=True)
+                self._pending_directive = directive
+                logger.info(f"play: commentary ({reaction.value}) after {since_last_spoken:.0f}s")
+                return Intent(kind="vision", vision=self._play_vision_event(), urgent=False,
+                              vision_directive=directive)
+            return Intent(kind="monologue", vision_directive=VisionDirective(
+                reaction=VisionReaction.SILENCE, target_sentences=0, rationale="play: quiet beat"))
+
         vision = self._pop_latest_vision()
         if vision is not None:
             vcfg = self._cfg.vision
@@ -401,7 +456,7 @@ class Orchestrator:
             heard = self._fresh_heard()
             now_h = time.time()
             if (heard and heard != self._last_reacted_heard
-                    and now_h - self._last_hearing_turn_ts >= 6.0):
+                    and now_h - self._last_hearing_turn_ts >= self._cfg.hearing.reply_gate_sec):
                 self._last_reacted_heard = heard
                 self._last_hearing_turn_ts = now_h
                 self._mood.on_scene_change()
@@ -481,6 +536,16 @@ class Orchestrator:
             ))
 
         return Intent(kind="monologue")
+
+    def _play_vision_event(self) -> "VisionEvent":
+        """A stand-in event for Play-mode commentary. The image is dropped (play mode grounds the
+        line in the agent's activity note), so a blank frame is fine when no real frame exists."""
+        if self._latest_frame is not None:
+            return self._latest_frame
+        from vision.vision_loop import VisionEvent
+        from vision.capture import Frame
+        return VisionEvent(frame=Frame(jpeg=b"", width=1, height=1), changed=True,
+                           change_type=ChangeType.DELTA, activity=ScreenActivity.STATIC)
 
     # --- interest pre-filter ---
     def _estimate_interest(self, vision: "VisionEvent") -> float:
@@ -566,7 +631,7 @@ class Orchestrator:
             lo, hi = 15.0, 28.0
         base = random.uniform(lo, hi)
         jitter = base * random.uniform(-0.25, 0.25)
-        target = max(2.0, base + jitter)
+        target = max(2.0, base + jitter) * self._cfg.vision.silence_fallback_scale
         logger.debug(f"silence target: {target:.1f}s (energy={energy:.2f})")
         return target
 
@@ -853,6 +918,8 @@ class Orchestrator:
             persistent_notes=self._memory.summary_for_prompt() if self._memory else None,
             topic_drift_style=self._cfg.topics.drift_style,
             allow_vision_skip=self._cfg.llm.allow_vision_skip,
+            current_goal=self._current_session_goal(),
+            enable_callbacks=self._cfg.persona.enable_callbacks,
         )
         provider_msgs = self._conv.to_provider_messages(
             system_prompt,
@@ -1201,6 +1268,8 @@ class Orchestrator:
                 f"chat:{m.platform}:{m.username}",
             )
         if intent.kind == "vision" and intent.vision is not None:
+            play = getattr(self._cfg, "play", None)
+            play_note = _live_activity() if (play is not None and play.enabled and play.talk_from_agent) else ""
             directive = intent.vision_directive
             if directive is None:
                 directive = VisionDirective(reaction=VisionReaction.DEEP, target_sentences=3)
@@ -1224,8 +1293,10 @@ class Orchestrator:
                     screen_activity=intent.vision.activity.value,
                     allow_vision_skip=self._cfg.llm.allow_vision_skip,
                     heard=self._fresh_heard(),
+                    activity_note=play_note,
                 ),
-                [ImageBlock(data=await self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")],
+                ([] if play_note
+                 else [ImageBlock(data=await self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")]),
                 "vision",
             )
         if intent.kind == "hearing":
@@ -1361,6 +1432,25 @@ class Orchestrator:
             self._segments_ended_with_question += 1
         else:
             self._segments_ended_with_question = 0
+
+    def _current_session_goal(self) -> Optional[str]:
+        """The character's current through-line goal, rotating into chapters over time."""
+        goals = self._cfg.persona.session_goals
+        if not goals:
+            return None
+        now = time.time()
+        rotate = self._cfg.persona.goal_rotate_sec
+        if self._current_goal is None:
+            self._goal_index = random.randrange(len(goals))
+            self._current_goal = goals[self._goal_index]
+            self._goal_started_ts = now
+            logger.info(f"goal: this session -> {self._current_goal}")
+        elif rotate > 0 and (now - self._goal_started_ts) >= rotate and len(goals) > 1:
+            self._goal_index = (self._goal_index + 1) % len(goals)
+            self._current_goal = goals[self._goal_index]
+            self._goal_started_ts = now
+            logger.info(f"goal: advanced -> {self._current_goal}")
+        return self._current_goal
 
     def _update_open_threads(self, spoken: str, intent_kind: str) -> None:
         """Detect questions / teases at the end of the last segment so the next

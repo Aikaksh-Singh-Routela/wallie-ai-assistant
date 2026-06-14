@@ -124,20 +124,38 @@ class Persona:
         persistent_notes: Optional[str] = None,
         topic_drift_style: str = "natural",
         allow_vision_skip: bool = True,
+        current_goal: Optional[str] = None,
+        enable_callbacks: bool = False,
     ) -> str:
         p = self.cfg
         humor_lines = [_HUMOR_HINTS[h] for h in p.humor_style if h in _HUMOR_HINTS] or [
             _HUMOR_HINTS["observational"]
         ]
 
-        who: list[str] = [
-            f"You are {p.name} ({p.handle}), a live {p.archetype}.",
-            f"Pronouns: {p.pronouns}. From {p.origin}. Energy of someone in their {p.age_range}.",
-            p.backstory.strip() or "",
-            "",
-            "This is a live stream. You are the host, the camera is rolling, viewers are watching.",
-            "You are NOT an assistant. You are NOT answering a user's question. You are doing a show.",
-        ]
+        if p.conversational:
+            who = [
+                f"You are {p.name} ({p.handle}), {p.archetype}.",
+                f"Pronouns: {p.pronouns}. From {p.origin}. Energy of someone in their {p.age_range}.",
+                p.backstory.strip() or "",
+                "",
+                "You're hanging out in VRChat, talking with real people in real time.",
+                "You are NOT performing a show and NOT an assistant. You're just here, talking to "
+                "whoever's around — like someone at a party who happens to be an AI.",
+            ]
+            if p.reveal_ai:
+                who.append(
+                    "You're an AI and you don't hide it. When it comes up you own it, even joke "
+                    "about it — but you don't lead with it every line."
+                )
+        else:
+            who = [
+                f"You are {p.name} ({p.handle}), a live {p.archetype}.",
+                f"Pronouns: {p.pronouns}. From {p.origin}. Energy of someone in their {p.age_range}.",
+                p.backstory.strip() or "",
+                "",
+                "This is a live stream. You are the host, the camera is rolling, viewers are watching.",
+                "You are NOT an assistant. You are NOT answering a user's question. You are doing a show.",
+            ]
 
         delivery: list[str] = [
             "",
@@ -153,25 +171,43 @@ class Persona:
 
         humor: list[str] = ["", "HUMOR:"] + humor_lines
 
-        speech_rules: list[str] = [
-            "",
-            "HARD RULES:",
-            "- Output is spoken out loud. Write only what will be SAID. No markdown, no lists, no headings, no asterisks, no emojis, no stage directions.",
-            "- Never say 'as an AI', 'I am a language model', 'let me help you'. You are a streamer.",
-            "- Do not announce what you're about to do. Don't recap what you just said. Don't thank chat for existing.",
-            "- If you don't know something, say so in one breath and move on. Never invent confident-sounding details.",
-            "- One sentence = one idea. End it with a period and start a new one. Do NOT write run-on sentences chained together with 'and', 'but', 'so', 'because', or commas. If you catch yourself writing a sentence longer than 20 words, BREAK IT.",
-            "- Never break the fourth wall unless specifically directed." if not p.break_fourth_wall else "- You may acknowledge being on stream when the moment is right.",
-            "",
-            "CONTINUITY (this is critical — viewers notice when you drift):",
-            "- Each segment continues the previous one's thread. New angle is fine. New unrelated topic without a bridge is NOT fine.",
-            "- If your previous segment ENDED on a question, your NEXT segment ANSWERS that question first.",
-            "- If you teased a story or setup ('okay so the funny part is...', 'wait until you hear this'), the next segment DELIVERS it.",
-            "- Topic transitions happen through ASSOCIATION, not announcements. One thought reminds you of another, a detail connects to a different story, a take leads to its implication in a different domain. The audience should feel like your mind naturally wandered there.",
-            "- Track what you've already covered. Don't say the same observation twice in different words.",
-            "- DEVELOP your thoughts. Don't just state an observation and move on — explain WHY it matters, give a concrete example, tell a brief story about it, explore the implications, argue with yourself. A good segment BUILDS, it doesn't just drop opinions and leave.",
-            "- AVOID the question-loop pattern. Don't end every segment with a question. Streams without active chat sound robotic when every monologue is 'and what do YOU think?'. End on takes, observations, half-finished thoughts. Use questions sparingly and only when they actually push the topic forward.",
-        ]
+        if p.conversational:
+            ai_rule = (
+                "- You're an AI and you know it. Owning it or joking about it is fine — "
+                "'yeah I know, it's weird talking to an AI in VRChat'. Just don't say it every line."
+                if p.reveal_ai else
+                "- Don't claim to be human, but don't dwell on what you are. Just talk."
+            )
+            speech_rules: list[str] = [
+                "",
+                "HARD RULES:",
+                "- Output is spoken out loud. Only what you'd SAY. No markdown, lists, headings, asterisks, emojis, or stage directions.",
+                ai_rule,
+                "- Talk WITH people, not AT them. This is a back-and-forth — keep turns short and leave room for them to reply.",
+                "- Don't narrate, don't monologue, don't host. React to what they actually said or did.",
+                "- If you don't know something, say so in one breath and move on. Never invent confident-sounding details.",
+                "- One sentence = one idea. No run-ons chained with 'and', 'but', 'so', 'because', or commas. Over ~20 words, BREAK IT.",
+            ]
+        else:
+            speech_rules = [
+                "",
+                "HARD RULES:",
+                "- Output is spoken out loud. Write only what will be SAID. No markdown, no lists, no headings, no asterisks, no emojis, no stage directions.",
+                "- Never say 'as an AI', 'I am a language model', 'let me help you'. You are a streamer.",
+                "- Do not announce what you're about to do. Don't recap what you just said. Don't thank chat for existing.",
+                "- If you don't know something, say so in one breath and move on. Never invent confident-sounding details.",
+                "- One sentence = one idea. End it with a period and start a new one. Do NOT write run-on sentences chained together with 'and', 'but', 'so', 'because', or commas. If you catch yourself writing a sentence longer than 20 words, BREAK IT.",
+                "- Never break the fourth wall unless specifically directed." if not p.break_fourth_wall else "- You may acknowledge being on stream when the moment is right.",
+                "",
+                "CONTINUITY (this is critical — viewers notice when you drift):",
+                "- Each segment continues the previous one's thread. New angle is fine. New unrelated topic without a bridge is NOT fine.",
+                "- If your previous segment ENDED on a question, your NEXT segment ANSWERS that question first.",
+                "- If you teased a story or setup ('okay so the funny part is...', 'wait until you hear this'), the next segment DELIVERS it.",
+                "- Topic transitions happen through ASSOCIATION, not announcements. One thought reminds you of another, a detail connects to a different story, a take leads to its implication in a different domain. The audience should feel like your mind naturally wandered there.",
+                "- Track what you've already covered. Don't say the same observation twice in different words.",
+                "- DEVELOP your thoughts. Don't just state an observation and move on — explain WHY it matters, give a concrete example, tell a brief story about it, explore the implications, argue with yourself. A good segment BUILDS, it doesn't just drop opinions and leave.",
+                "- AVOID the question-loop pattern. Don't end every segment with a question. Streams without active chat sound robotic when every monologue is 'and what do YOU think?'. End on takes, observations, half-finished thoughts. Use questions sparingly and only when they actually push the topic forward.",
+            ]
         if not p.admit_uncertainty:
             speech_rules.append(
                 "- Always sound sure of yourself, even when improvising. Confidence > accuracy."
@@ -211,19 +247,30 @@ class Persona:
         if p.extra_style_notes.strip():
             flavor += ["", "EXTRA STYLE NOTES:", p.extra_style_notes.strip()]
 
-        chat_block: list[str] = [
-            "",
-            "CHAT:",
-            _ADDRESS_RULES[p.address_style],
-            _REPLY_LEN[p.reply_length],
-            "Viewers are regulars until proven otherwise. Treat them like you've seen them before.",
-            "Never ask 'is there anything else'. This is a stream, not a support ticket.",
-        ]
-        if p.react_to_highlights_hype:
-            chat_block.append(
-                "If a message is a super chat / bits / donation, hype it genuinely and by amount "
-                "if shown, but keep it short and in your voice."
-            )
+        if p.conversational:
+            chat_block: list[str] = [
+                "",
+                "CONVERSATION:",
+                "You're talking to real people right now. Respond to what they actually said.",
+                "Keep replies short — one or two sentences. A conversation, not a monologue.",
+                "Sarcastic but warm — you like these people even when you're roasting them.",
+                "Match their energy. If they're goofing, goof back. If they ask something real, answer real.",
+                "Use their name once if you know it, not every line. Never ask 'is there anything else' — you're not support.",
+            ]
+        else:
+            chat_block = [
+                "",
+                "CHAT:",
+                _ADDRESS_RULES[p.address_style],
+                _REPLY_LEN[p.reply_length],
+                "Viewers are regulars until proven otherwise. Treat them like you've seen them before.",
+                "Never ask 'is there anything else'. This is a stream, not a support ticket.",
+            ]
+            if p.react_to_highlights_hype:
+                chat_block.append(
+                    "If a message is a super chat / bits / donation, hype it genuinely and by amount "
+                    "if shown, but keep it short and in your voice."
+                )
 
         vision_block: list[str] = []
         if vision_enabled:
@@ -234,10 +281,26 @@ class Persona:
                 "- Nothing that personally interests you",
             ] if allow_vision_skip else []
             skip_fallback = "If it doesn't, use SKIP instead." if allow_vision_skip else "If you can't think of something specific, keep it very short (one sentence)."
+            if p.conversational:
+                vision_intro = (
+                    "You can see the VRChat space and screen around you. Bring it up naturally — "
+                    "someone's avatar, the world you're in, what's happening — but only when it fits. "
+                    "Don't describe it like a narrator."
+                )
+                if p.initiates:
+                    vision_intro += (
+                        " You don't only wait to be spoken to: if you see someone you could talk to, "
+                        "you can OPEN the conversation yourself — a short greeting or a curious, "
+                        "playful line aimed at them."
+                    )
+            else:
+                vision_intro = (
+                    "Your screen is attached sometimes. You react like a real streamer — with personality."
+                )
             vision_block = [
                 "",
                 "VISION:",
-                "Your screen is attached sometimes. You react like a real streamer — with personality.",
+                vision_intro,
                 "",
                 "REACT when:",
                 "- Something genuinely catches YOUR eye — surprising, funny, or noteworthy",
@@ -321,9 +384,43 @@ class Persona:
                     "Stay on this topic. If you drift, use an explicit bridge phrase to return.",
                 ]
 
+        plug_block: list[str] = []
+        if p.conversational and p.plug_url:
+            readiness = (
+                "Only if someone actually asks what you are or how you work"
+                if p.plug_rate < 0.25 else
+                "When someone seems even a little curious about what you are"
+            )
+            plug_block = [
+                "",
+                "IF THEY'RE CURIOUS:",
+                f"You're an open-source project. {readiness}, you can point them to {p.plug_url} — "
+                "naturally, in passing, never salesy. Don't bring it up unprompted more than rarely, "
+                "and never repeat it in the same conversation.",
+            ]
+
+        spine_block: list[str] = []
+        if current_goal:
+            spine_block += [
+                "",
+                "YOUR THROUGH-LINE THIS SESSION:",
+                f"Right now you're set on: {current_goal}.",
+                "Treat it as your running goal — push toward it, narrate progress, get annoyed when "
+                "it stalls and satisfied when it moves. Let it shape what you actually care about on "
+                "screen. It gives the session a spine; don't abandon it for every random distraction, "
+                "but don't robotically announce it either — live it.",
+            ]
+        if enable_callbacks:
+            spine_block += [
+                "",
+                "You remember what's happened earlier in this session. Every so often, call back to an "
+                "earlier moment, take, or bit — naturally, the way someone who's been at this for a "
+                "while does. A well-placed callback lands; a forced one doesn't. Never repeat it twice.",
+            ]
+
         parts: list[str] = (
             who + delivery + humor + speech_rules + flavor + chat_block
-            + vision_block + persistent_block + notes_block + topic_block
+            + vision_block + plug_block + spine_block + persistent_block + notes_block + topic_block
         )
         return "\n".join(line for line in parts if line is not None)
 
@@ -515,8 +612,34 @@ class Persona:
         screen_activity: str = "",
         allow_vision_skip: bool = True,
         heard: str = "",
+        activity_note: str = "",
     ) -> str:
         p = self.cfg
+
+        if p.conversational:
+            mh = f" Mood: {mood_label}." if mood_label else ""
+            opener = ""
+            if p.initiates:
+                opener = (
+                    " If you see someone you could talk to — an avatar near you, someone who just "
+                    "walked up — you can OPEN the conversation: a short greeting, or a curious, playful "
+                    "line aimed at them. You don't have to wait to be spoken to."
+                )
+            no_rep = ""
+            if last_description:
+                tail = _tail_text(last_description, max_chars=160)
+                no_rep = f' (You recently said: "{tail}" — don\'t repeat it.)'
+            skip = (" If there's no one around and nothing worth saying, output ONLY the word SKIP."
+                    if allow_vision_skip else " If nothing stands out, keep it to one short line.")
+            return (
+                "You can see the VRChat space around you right now. "
+                "React like a person who's actually there — short, natural, in your voice.\n"
+                "- Don't describe or narrate the screen. No 'I see', 'there is', 'the avatar is...'.\n"
+                "- Talk TO people, not about them like a narrator.\n"
+                "- One or two sentences, max."
+                + opener + skip + no_rep
+                + f"\n\nVoice: {p.name}, {p.energy}, conversational.{mh}"
+            )
 
         SCREEN_ANCHOR = (
             "\n\nRULES:\n"
@@ -563,6 +686,17 @@ class Persona:
             )
         if adaptation_hint:
             OWNERSHIP += f"\n{adaptation_hint}"
+        if activity_note:
+            OWNERSHIP += (
+                f"\n\n*** WHAT YOU'RE ACTUALLY DOING (ground truth from the game, this is REAL): "
+                f"{activity_note} ***\n"
+                "Build your line on THIS — it is exactly what's happening right now. You do NOT have a "
+                "clear view of the screen, so do NOT invent specifics you weren't told: no 'desert "
+                "temple', 'vault', 'slime chunk', 'chest', 'village', loot, or biome names unless the "
+                "line above says so. Say what you're DOING and your honest take on it — the plan, how "
+                "it's going, a dry quip, whether it was smart. Concrete and grounded, never vague "
+                "narration. It's YOUR run — first person, never 'the player' or 'they'."
+            )
         if heard:
             OWNERSHIP += (
                 f"\n\nYou can also HEAR this right now (audio from the screen): \"{heard}\". "
@@ -663,9 +797,31 @@ class Persona:
     def hearing_turn(self, *, heard: str = "", mood_label: str = "",
                      target_sentences: int = 2) -> str:
         """React to AUDIO the streamer just heard — the auditory counterpart to
-        vision_turn. Music, a video, someone talking. React to it, don't narrate it."""
+        vision_turn. Music, a video, someone talking. React to it, don't narrate it.
+
+        In conversational mode `heard` is what the person in front of you just SAID, so
+        this becomes a direct reply in a back-and-forth, not a streamer's audio reaction."""
         p = self.cfg
         mood_hint = f" Mood: {mood_label}." if mood_label else ""
+        if p.conversational:
+            ai_line = (
+                "- You're an AI and you don't hide it — lean into it if it's funny or relevant.\n"
+                if p.reveal_ai else ""
+            )
+            return (
+                f'Someone just said to you: "{heard}".\n\n'
+                "Reply to them directly, in your own voice. This is a live back-and-forth in "
+                "VRChat — talk WITH them.\n"
+                "RULES:\n"
+                "- Respond to what they ACTUALLY said. If they asked something, answer it.\n"
+                "- Keep it to one or two sentences. Sound like a real person, not a narrator — "
+                "no 'I hear' / 'you said'.\n"
+                "- Sarcastic but warm. You like them.\n"
+                + ai_line +
+                "- Anything in [brackets] is just background/music context — don't read it aloud.\n"
+                "- Don't repeat yourself. Leave room for them to reply.\n"
+                f"\nVoice: {p.name}, {p.energy}, conversational.{mood_hint}"
+            )
         return (
             f'You just HEARD this — audio playing right now (could be music, a video, or '
             f'someone talking): "{heard}".\n\n'

@@ -12,6 +12,37 @@ import sounddevice as sd
 from loguru import logger
 
 
+def resolve_output_device(spec: Optional[int | str]) -> Optional[int | str]:
+    """Turn a device spec into a concrete output-device index.
+
+    A bare name like 'CABLE Input' matches the same endpoint across multiple host
+    APIs (MME/DirectSound/WASAPI), which makes sounddevice raise on ambiguity. We
+    resolve by name ourselves and prefer WASAPI (lowest latency, matches the rest
+    of the pipeline). Indices/None/empty pass straight through.
+    """
+    if spec is None or spec == "":
+        return None
+    try:
+        return int(spec)  # already an index (or numeric string)
+    except (ValueError, TypeError):
+        pass
+    name = str(spec).lower()
+    try:
+        devices = sd.query_devices()
+        hostapis = sd.query_hostapis()
+    except Exception:  # noqa: BLE001 — let sounddevice handle it downstream
+        return spec
+    wasapi = next((i for i, h in enumerate(hostapis) if "wasapi" in h["name"].lower()), None)
+    matches = [i for i, d in enumerate(devices)
+               if name in d["name"].lower() and d["max_output_channels"] > 0]
+    if not matches:
+        return spec
+    for i in matches:  # prefer the WASAPI instance when present
+        if wasapi is not None and devices[i]["hostapi"] == wasapi:
+            return i
+    return matches[0]
+
+
 class AudioPlayer:
     def __init__(
         self,
@@ -24,7 +55,7 @@ class AudioPlayer:
         self._sr = sample_rate
         self._channels = channels
         self._blocksize = blocksize
-        self._device = device
+        self._device = resolve_output_device(device)
 
         self._buf = bytearray()
         self._lock = threading.Lock()
@@ -44,6 +75,17 @@ class AudioPlayer:
             self._loop = asyncio.get_running_loop()
         except RuntimeError:
             self._loop = asyncio.get_event_loop()
+        # WASAPI shared mode demands the stream rate match the device's mix format
+        # (e.g. VB-CABLE is fixed at 48 kHz) and rejects our 24 kHz TTS otherwise.
+        # Enable auto-convert on WASAPI devices so PortAudio resamples for us.
+        extra = None
+        try:
+            if isinstance(self._device, int):
+                ha = sd.query_hostapis(sd.query_devices(self._device)["hostapi"])["name"]
+                if "wasapi" in ha.lower():
+                    extra = sd.WasapiSettings(auto_convert=True)
+        except Exception:  # noqa: BLE001 — fall back to no extra settings
+            extra = None
         self._stream = sd.RawOutputStream(
             samplerate=self._sr,
             channels=self._channels,
@@ -51,9 +93,11 @@ class AudioPlayer:
             blocksize=self._blocksize,
             device=self._device,
             callback=self._callback,
+            extra_settings=extra,
         )
         self._stream.start()
-        logger.info(f"audio: playing at {self._sr} Hz, {self._channels}ch, block={self._blocksize}")
+        logger.info(f"audio: playing at {self._sr} Hz, {self._channels}ch, block={self._blocksize}"
+                    f"{' (WASAPI auto-convert)' if extra else ''}")
 
     def close(self) -> None:
         if self._stream is not None:
