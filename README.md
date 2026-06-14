@@ -56,6 +56,26 @@ Pick the personality. Pick the voice. Pick the LLM. Pick the platform. Everythin
 
 ---
 
+## 🎮 New in v2.0 — Wallie can now **PLAY**
+
+Wallie doesn't just watch your screen anymore — **it picks up the game and plays it.** Right now that's Minecraft: it gathers, crafts, builds, fights, and explores entirely on its own, narrating every moment in character. Smooth, human-looking camera. No human at the keyboard, no script — a real playthrough with a personality.
+
+https://www.youtube.com/shorts/NEfsmppOXJk
+
+And here's the part that makes it believable: **the commentary is grounded in what Wallie is _actually_ doing** — its real inventory, health, and current goal — not guessed from a blurry frame. So it says *"heading down to mine diamonds"* because it is, and brings up *"that one time I dug straight into a lava pit"* because that's its run.
+
+- **It actually plays** — a planning brain sets the goal; [Baritone](https://github.com/cabaletta/baritone) handles pathfinding & mining, and a custom Fabric mod handles crafting, combat, item pickup, and a buttery-smooth camera that looks human, not robotic.
+- **Grounded commentary** — the streamer core stays in sync with the playing brain, so what it _says_ matches what it _does_.
+- **One-click setup** — the dashboard installs Fabric + every mod for you (and backs up your current ones first).
+- **Any persona, any model** — Play is just another mode. Vision, Hearing, and Play each toggle on/off independently.
+
+> Flip on **Play** in the dashboard, pick a goal, and go — or jump straight in:
+> ```bash
+> python scripts/run_wallie_live.py
+> ```
+
+---
+
 ## Why another AI streamer?
 
 Because the existing ones are toys.
@@ -150,6 +170,15 @@ Wallie captures your system audio (WASAPI loopback) and reacts to it live, fused
 - **Pure-hearing mode** — run it with vision off and it reacts to audio the way it reacts to a screen: stays quiet, listens, then reacts to what's playing.
 
 Enable it in the dashboard's Hearing section. Needs two extra deps: `pip install soundcard faster-whisper`.
+
+### Wallie plays games — not just watches them
+
+**Play mode** hands Wallie the controls. First game: Minecraft, survival, live and unscripted.
+
+- **Reliable autonomy** — a planning brain picks high-level goals; a deterministic skill library (crafting, smelting, full tool/armour sets, mining to ore depths, hunting for food & wool, beds, combat with weapon selection, dropped-item pickup) does the actual work — so even a small/free model plays competently instead of flailing.
+- **Human-like camera** — a custom Fabric mod eases every turn at full FPS. No snapping, no teleport-cam — it reads like a person playing.
+- **Grounded commentary** — reactions come from the agent's real game state (inventory, health, threats, current goal), fused through the same single pipeline as vision and hearing. No screen-guessing, no hallucinated "desert temples".
+- **One-click install** — Fabric + all mods straight from the dashboard's Play section. Vision/Hearing/Play toggle independently, on any persona.
 
 ### Live2D avatar with emotion
 
