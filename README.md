@@ -506,6 +506,22 @@ Issues and PRs welcome. Ground rules:
 
 MIT. See [LICENSE](LICENSE).
 
+### Bundled / third-party software (Minecraft Play)
+
+Wallie's own code is MIT. The Minecraft Play mode uses several third-party mods, which are
+installed (and, for convenience, bundled under `dist/mods/`) and remain under their own licenses:
+
+| Mod | License | Source |
+|---|---|---|
+| **Baritone** (pathfinding/mining) | LGPL-3.0 | https://github.com/cabaletta/baritone |
+| **Meteor Client** (loads Baritone) | GPL-3.0 | https://github.com/MeteorDevelopment/meteor-client |
+| **Fabric API** | Apache-2.0 | https://github.com/FabricMC/fabric |
+| **Fabric Loader** | Apache-2.0 | https://github.com/FabricMC/fabric-loader |
+| smooth-camera mod (Wallie's own) | MIT | this repo |
+
+These mods are used unmodified and distributed as separate jars (mere aggregation); they are the
+property of their respective authors. Each is freely available at the source links above.
+
 ---
 
 <p align="center">
