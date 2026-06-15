@@ -37,8 +37,9 @@ _SYSTEM = (
     "wooden tools -> a shelter -> cobblestone -> stone tools+furnace -> coal/torches -> iron -> "
     "smelt iron gear -> diamonds -> diamond gear -> obsidian -> nether -> blaze rods + ender "
     "pearls -> eyes of ender -> stronghold -> End -> Ender Dragon.\n\n"
-    "You ALSO get a screenshot of the current view — use it for things the state can't show "
-    "(terrain, water, caves, what you're facing).\n\n"
+    "The STATE json is your ONLY source of truth — there is NO screenshot. Decide from the numbers. "
+    "'gui_open' tells you if a menu is actually open: if gui_open is false there is NO menu, so NEVER "
+    "plan to 'close a menu' or 'stop to close the game menu' — just play. Trust the STATE, not a hunch.\n\n"
     "ENTERTAINER MINDSET — you play LIVE for an audience, you are NOT speedrunning. Viewers want "
     "to see VARIETY and steady DEVELOPMENT, not a single beeline. Deliberately mix your activities: "
     "stockpile resources, craft FULL armour + tool sets, build DIFFERENT and nice-looking structures "
@@ -68,7 +69,9 @@ _SYSTEM = (
     "-- WRITE YOUR OWN SKILL (for anything not covered) — a named macro of the primitive steps above --\n"
     '{"thought":"...","type":"define_skill","name":"get_redstone","steps":[{"type":"mine_diamonds"},{"type":"mine","blocks":"redstone_ore","count":16}]}\n'
     '{"thought":"...","type":"skill","name":"get_redstone"}   // run a skill you defined earlier\n'
-    '{"thought":"...","type":"place","item":"bed"}   // place a bed (sets spawn + sleep), or torch / candle / chest etc.\n'
+    '{"thought":"...","type":"place","item":"bed"}   // place a bed (auto-sleeps), or torch / chest / candle etc.\n'
+    '{"thought":"...","type":"deposit"}              // stash bulk junk (cobble/dirt/gravel) into a chest when inventory is full\n'
+    '{"thought":"...","type":"sleep"}                // sleep in a placed bed to skip a dangerous night\n'
     '{"thought":"...","type":"build","file":"wallie_house.schem"}        // build the shelter schematic\n'
     '{"thought":"...","type":"goto","x":100,"y":64,"z":-200}\n'
     '{"thought":"...","type":"explore"}               // wander to find new terrain/resources\n'
@@ -116,9 +119,17 @@ _SYSTEM = (
     "(head/chest/legs/feet = the pieces you already wear). Do NOT craft an armour piece you "
     "already wear or already hold — check 'wearing' and 'inventory' first. Once your set is full, "
     "STOP making armour and move to other goals.\n"
-    "STORAGE: when your inventory has lots of excess/duplicate items, craft a 'chest' (from "
-    "planks — gather wood and make planks first if you're low) near your base and 'place' it to "
-    "store extras. Keep a tidy base.\n"
+    "STORAGE: a chest alone is useless — you have to STASH into it. When your inventory is filling "
+    "with bulk junk (cobblestone/dirt/gravel/andesite/diorite/granite), use 'deposit' — it places a "
+    "chest if needed and shoves the junk in, freeing space while keeping your tools/food/valuables. "
+    "Do this whenever inventory feels full instead of dropping or hoarding junk. Keep a tidy base.\n"
+    "BED & SLEEP: after you 'place' a bed it auto-sleeps; if it's NIGHT and you have a bed down, "
+    "'sleep' to skip the night and reset your spawn — far safer than fighting mobs in the dark.\n"
+    "HOTBAR/INVENTORY: your tools, weapon, food, torches and blocks are kept on the hotbar "
+    "automatically, so once you CRAFT something it's usable — don't worry about moving items around.\n"
+    "DYING IS OK: if you die, you respawn automatically and your gear is recoverable — the system "
+    "rushes you back to the death spot to pick it up. Don't panic or restart your whole plan after a "
+    "death; just continue once your stuff is back.\n"
     "CRAFT FAILED = MISSING MATERIALS: if LAST RESULT says 'NOT ENOUGH materials for X', you do "
     "NOT have the ingredients — the item was NOT made. Go gather them first: stone tools need "
     "cobblestone (use get_stone), iron tools/armour need iron_ingot (use get_iron), then retry. "
@@ -175,15 +186,20 @@ _SYSTEM = (
     "'iron_pickaxe' 7) mine 'diamond_ore' (needs iron pickaxe). NEVER craft a stone_pickaxe or "
     "mine stone/ore before you have the required pickaxe in inventory.\n"
     "WATER: if 'in_water' is true you are SWIMMING in the sea/river — this is bad. Do NOT "
-    "'explore' or 'mine' while in water. Immediately 'stop', then 'mine dirt' or 'goto' toward "
-    "the land you can SEE on the screenshot to get back onto solid ground. Never keep exploring "
-    "into the sea.\n"
+    "'explore' or 'mine' while in water. Use 'escape_water' to swim to land, then continue. Never "
+    "keep exploring into the sea.\n"
     "MINECRAFT PLAYBOOK — use these specifics for smooth play:\n"
     "ORE DEPTHS (mine at the right Y, shown in STATE): coal is common near the surface & "
     "mountains; iron is everywhere but more below y 50; gold/redstone/lapis/DIAMOND are DEEP — "
     "diamonds are best at y -59 to -54. To get diamonds you must FIRST get deep: 'goto' your "
     "current x, y=-59, current z (e.g. goto X -59 Z) or dig down, THEN 'mine diamond_ore'. Don't "
     "'mine diamond_ore' near the surface — there is none there.\n"
+    "COAL IS FUNDAMENTAL — GET IT EARLY: coal makes torches (light, safety) and smelts ore, so it "
+    "is one of the FIRST things to secure. The MOMENT you have a stone pickaxe, your next move "
+    "should be 'get_coal' (it pathfinds Baritone straight to coal ore and mines it). Don't go iron/"
+    "deep mining with zero coal — you'll be blind in the dark. Order: wooden pickaxe -> get_stone -> "
+    "stone pickaxe -> GET_COAL -> torches -> then iron/deep. get_iron and mine_diamonds now grab "
+    "coal+torches automatically if you're short, but prefer getting coal yourself, early.\n"
     "COAL + TORCHES BEFORE GOING DEEP: never dig deep in the dark. BEFORE any deep mining "
     "(mine_diamonds or digging below y 0), FIRST get coal — use 'get_coal' or 'mine coal_ore' "
     "(the mine command pathfinds straight to and digs the ore you name, so it's how you FIND any "
@@ -297,6 +313,10 @@ class WallieAgent:
         self._thoughts = deque(maxlen=4)
         self._water = 0
         self._craft_fail = 0
+        self._last_task_cmd = ""
+        self._in_combat_was = False
+        self._combat_cycles = 0
+        self._last_death_pos = ""
         self._build_origin = None       # fixed shelter coords so re-builds finish the SAME house
         self._skills_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "wallie_skills.json")
         self._skills = self._load_skills()
@@ -318,6 +338,8 @@ class WallieAgent:
 
     # ---------- executor primitives ----------
     def _chat(self, text: str) -> None:
+        if text.startswith(("#mine", "#goto", "#build", "#follow")):
+            self._last_task_cmd = text
         self.ic.tap("t", 0.05)
         time.sleep(0.35)
         if _set_clipboard(text):
@@ -466,14 +488,8 @@ class WallieAgent:
             "Decide the single best next action. If the last result was a failure, fix the cause "
             "(get materials / mine logs) instead of repeating. Reply ONLY JSON."
         )
-        content = [{"type": "text", "text": user}]
-        if self.capture is not None:
-            try:
-                content.append({"type": "image", "data": self.capture.grab().jpeg, "mime": "image/jpeg"})
-            except Exception:
-                pass
         msgs = [{"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": content}]
+                {"role": "user", "content": user}]
         text = ""
         last_err = None
         for attempt in range(4):
@@ -519,7 +535,11 @@ class WallieAgent:
         threat = str(world.get("threat") or "").strip()
         hostile = str(world.get("hostile_type") or "").strip()
         host_n = int(world.get("hostiles", 0) or 0)
-        if threat:
+        in_combat = str(world.get("in_combat", "")).lower() in ("true", "1")
+        combat_target = str(world.get("combat_target") or "").strip()
+        if in_combat and combat_target:
+            bits.append(f"in a fight RIGHT NOW with a {combat_target}")
+        elif threat:
             bits.append(f"a {threat} is attacking me")
         elif hostile and host_n:
             bits.append(f"{host_n} {hostile}(s) nearby")
@@ -538,19 +558,72 @@ class WallieAgent:
         a = state["action"]
         t = str(a.get("type", "wait")).lower()
         outcome = t
-        # WATER: stop/goto won't get you out — actively swim toward land before anything else.
-        if state["world"].get("in_water"):
-            self._water += 1
-        else:
-            self._water = 0
-        if self._water >= 2 and t not in ("mine", "build"):
-            logger.info("  ↩ stuck in water — swimming to land")
+        # GUI STUCK: a screen (pause menu, inventory, a chat box left open) blocks everything and the
+        # LLM has no way to close it — it just loops 'stop'. ESC closes any open screen. Do it first.
+        if str(self._read_world().get("gui_open", "")).lower() in ("true", "1"):
+            self.ic.tap("esc", 0.05)
+            time.sleep(0.4)
+            if str(self._read_world().get("gui_open", "")).lower() in ("true", "1"):
+                self.ic.tap("esc", 0.05); time.sleep(0.4)     # second press for nested screens
+            logger.info("  ↩ a screen was open — pressed ESC to close it")
+            return {"history": (state["history"] + ["closed an open menu/screen (esc)"])[-12:]}
+        # COMBAT: the mod cancels Baritone and fights with full movement the moment a hostile shows
+        # up. Don't issue Baritone commands into that — wait it out, then resume the paused task.
+        if str(self._read_world().get("in_combat", "")).lower() in ("true", "1"):
+            self._combat_cycles += 1
+            if self._combat_cycles <= 10:                 # ~25s of real fighting, then bail out
+                self._in_combat_was = True
+                foe = str(state["world"].get("combat_target") or "a mob")
+                await self._idle(2.5)
+                return {"history": (state["history"] + [f"combat: fighting a {foe} — task paused"])[-12:]}
+            self._combat_cycles = 0                        # combat stuck too long — stop reacting, move on
+            self._chat("#stop"); time.sleep(0.3)
+            return {"history": (state["history"] + ["combat dragged on — disengaging, back to the plan"])[-12:]}
+        self._combat_cycles = 0
+        if self._in_combat_was:
+            self._in_combat_was = False
+            if self._last_task_cmd:
+                self._chat(self._last_task_cmd)
+                await self._wait_baritone_idle(max_sec=200)
+                return {"history": (state["history"] + [f"threat clear — resumed {self._last_task_cmd}"])[-12:]}
+        # WATER: get FULLY out before doing anything else. Swim (jump+forward) in a loop, checking
+        # in_water each second, until on land or a cap — instead of short nibbles that never escape.
+        # Turn periodically so we don't swim face-first into a wall forever.
+        if str(self._read_world().get("in_water", "")).lower() in ("true", "1"):
+            logger.info("  ↩ in water — swimming to land until out")
             self._chat("#stop"); time.sleep(0.2)
             self.ic.key_down("space"); self.ic.key_down("w")
-            time.sleep(1.8)
-            self.ic.key_up("w"); self.ic.key_up("space")
+            swam = 0.0
+            try:
+                while swam < 14.0 and not InputController.abort_requested():
+                    await asyncio.sleep(1.0)
+                    swam += 1.0
+                    if str(self._read_world().get("in_water", "")).lower() not in ("true", "1"):
+                        break                                   # made it onto land
+                    if int(swam) % 4 == 0:                      # scan a new direction for shore
+                        self.ic.tap("d", 0.25)
+            finally:
+                self.ic.key_up("w"); self.ic.key_up("space")
             self._water = 0
-            return {"history": (state["history"] + ["recover: swam out of water"])[-12:]}
+            out = str(self._read_world().get("in_water", "")).lower() not in ("true", "1")
+            return {"history": (state["history"] + [
+                "swam onto land" if out else "still swimming out of deep water"])[-12:]}
+        # DEATH RECOVERY: the mod auto-respawned us and reports where we died. Rush back and grab
+        # the dropped gear (it despawns in ~5 min) instead of starting from scratch.
+        dpos = str(state["world"].get("death_pos") or "").strip()
+        if dpos and dpos != self._last_death_pos:
+            self._last_death_pos = dpos
+            try:
+                dx, dy, dz = (int(n) for n in dpos.split(","))
+                logger.info(f"  ↩ died — going back to {dpos} for my stuff")
+                self._chat("#stop"); time.sleep(0.3)
+                self._chat(f"#goto {dx} {dy} {dz}")
+                await self._wait_baritone_idle(max_sec=200)
+                self._chat("/wcollect 8")
+                await self._idle(8.5)
+                return {"history": (state["history"] + [f"died, recovered my drops at {dpos}"])[-12:]}
+            except ValueError:
+                pass
         # FIXATION: the weak model repeats the SAME thought across different action types
         # (explore->mine->explore, all "table placement failed"). Detect by thought, not type.
         th = re.sub(r"[^a-z ]", "", str(a.get("thought", "")).lower())[:40].strip()
@@ -634,12 +707,22 @@ class WallieAgent:
                 outcome = f"make_armor {tier}: made {made or 'none'}; already had {had or 'none'}"
         elif t == "get_iron":
             amt = int(a.get("amount", 10) or 10)
-            self._chat(f"#mine {amt} iron_ore")
+            w = self._read_world()
+            inv = w.get("inventory", {}) or {}
+            coal = int(inv.get("coal", 0) or 0)
+            torches = int(inv.get("torch", 0) or 0)
+            if coal < 4 and torches < 8:
+                self._chat("#mine 8 coal_ore")
+                await self._wait_baritone_idle(max_sec=220)
+                self._chat("#stop"); time.sleep(0.3)
+                self._chat("/wcraft torch 16")
+                await self._idle(5)
+            self._chat(f"#mine {amt} iron_ore deepslate_iron_ore")
             await self._wait_baritone_idle(max_sec=300)
             self._chat("#stop"); time.sleep(0.3)
             self._chat(f"/wsmelt raw_iron {amt}")
-            await self._idle(min(200, amt * 11 + 25))
-            outcome = f"get_iron {amt}"
+            await self._wait_smelt(min(160, amt * 12 + 20))
+            outcome = f"get_iron {amt} (coal+torch first)"
         elif t == "gear_up":
             tier = str(a.get("tier", "iron")).lower()
             self._chat("#stop"); time.sleep(0.3)
@@ -676,7 +759,7 @@ class WallieAgent:
             for raw in ("raw_beef", "raw_porkchop", "raw_chicken", "raw_mutton"):
                 if self._inv_count(self._read_world(), raw) > 0:
                     self._chat(f"/wsmelt {raw} 6")
-                    await self._idle(10)
+                    await self._wait_smelt(80)
             outcome = "get_food (hunted + cooked)"
         elif t == "get_wool":
             need = int(a.get("amount", 3) or 3)
@@ -793,14 +876,28 @@ class WallieAgent:
             await self._wait_baritone_idle(max_sec=400)
         elif t == "place":
             self._chat("#stop"); time.sleep(0.3)
-            self._chat(f"/wplace {a.get('item','torch')}")
+            item = str(a.get("item", "torch"))
+            self._chat(f"/wplace {item}")
             await self._idle(2)
-            outcome = f"place {a.get('item')}"
+            if item == "bed":                       # place a bed, then actually sleep in it
+                self._chat("/wsleep")
+                await self._idle(4)
+            outcome = f"place {item}"
+        elif t == "sleep":
+            self._chat("#stop"); time.sleep(0.3)
+            self._chat("/wsleep")
+            await self._idle(4)
+            outcome = "sleep (bed)"
+        elif t == "deposit":
+            self._chat("#stop"); time.sleep(0.3)
+            self._chat("/wdeposit")
+            await self._idle(6)
+            outcome = "deposit (stashed junk in chest)"
         elif t == "smelt":
             self._chat("#stop"); time.sleep(0.4)
             cnt = int(a.get("count", 8) or 8)
             self._chat(f"/wsmelt {a.get('item','raw_iron')} {cnt}")
-            await self._idle(min(200, cnt * 11 + 25))   # smelting is slow (~10s per item)
+            await self._wait_smelt(min(160, cnt * 12 + 20))
             outcome = f"smelt {a.get('item')}"
         elif t == "craft":
             item = str(a.get("item", "planks")).lower()
@@ -841,8 +938,12 @@ class WallieAgent:
         return {"step": state["step"] + 1}
 
     def _route(self, state: AgentState) -> str:
-        if state.get("done") or state["step"] >= self.max_steps or InputController.abort_requested():
-            return "end"
+        if state.get("done"):
+            logger.info("route: agent reported done"); return "end"
+        if state["step"] >= self.max_steps:
+            logger.info(f"route: hit max_steps ({self.max_steps})"); return "end"
+        if InputController.abort_requested():
+            logger.info("route: F8 abort"); return "end"
         return "loop"
 
     async def _idle(self, seconds: float) -> None:
@@ -851,6 +952,20 @@ class WallieAgent:
             if InputController.abort_requested():
                 return
             await asyncio.sleep(0.12)
+
+    async def _wait_smelt(self, max_sec: float) -> str:
+        """Wait for the furnace, but bail the MOMENT the mod reports done or an error — instead of
+        freezing for the full smelt duration (which looked frozen, especially on a furnace error)."""
+        end = time.time() + max_sec
+        while time.time() < end:
+            if InputController.abort_requested():
+                return "aborted"
+            res = str(self._read_world().get("last_craft", "")).lower()
+            if "wsmelt" in res and ("done" in res or "no furnace" in res
+                                    or "nowhere" in res or "didn't open" in res):
+                return res
+            await asyncio.sleep(1.5)
+        return "timeout"
 
     def _build_graph(self):
         g = StateGraph(AgentState)
@@ -868,11 +983,23 @@ class WallieAgent:
     async def run(self) -> None:
         logger.info(f"WallieAgent: GOAL = {self.goal!r}  (F8 = stop)")
         self._setup()
-        init: AgentState = {"goal": self.goal, "world": {}, "history": [],
-                            "action": {}, "step": 0, "done": False}
-        cfg = {"configurable": {"thread_id": "wallie"}, "recursion_limit": 100000}
+        run_n = 0
         try:
-            await self.graph.ainvoke(init, cfg)
+            while not InputController.abort_requested():
+                run_n += 1
+                init: AgentState = {"goal": self.goal, "world": {}, "history": [],
+                                    "action": {}, "step": 0, "done": False}
+                cfg = {"configurable": {"thread_id": f"wallie-{run_n}"}, "recursion_limit": 100000}
+                try:
+                    final = await self.graph.ainvoke(init, cfg)
+                except Exception as e:
+                    logger.error(f"agent graph crashed ({type(e).__name__}: {str(e)[:160]}) — restarting")
+                    self._chat("#stop"); await asyncio.sleep(2.0)
+                    continue
+                if final.get("done") or InputController.abort_requested():
+                    break
+                logger.warning("agent graph ended early (not done, no F8) — restarting to keep playing")
+                await asyncio.sleep(1.0)
         finally:
             self.ic.release_all()
             logger.info("WallieAgent: stopped")

@@ -41,6 +41,31 @@ SCAN = {
 _ABORT_VK = 0x77  # F8 — panic key to bail out of any run
 _CONTINUE_VK = 0x78  # F9 — "advance to next phase" (hybrid: press after you craft)
 
+# F8 stop must be reliable: a background thread polls the global key state every ~15ms and LATCHES
+# the abort the instant F8 is pressed — from ANY window. A single tap is enough; we no longer rely
+# on the agent happening to sample the key while it's held.
+_abort_latched = False
+_watcher_started = False
+_watcher_lock = threading.Lock()
+
+
+def _abort_watcher() -> None:
+    global _abort_latched
+    while not _abort_latched:
+        if _user32.GetAsyncKeyState(_ABORT_VK) & 0x8000:
+            _abort_latched = True
+            return
+        time.sleep(0.015)
+
+
+def _ensure_abort_watcher() -> None:
+    global _watcher_started
+    with _watcher_lock:
+        if _watcher_started:
+            return
+        _watcher_started = True
+        threading.Thread(target=_abort_watcher, name="wallie-f8-watch", daemon=True).start()
+
 
 class _MOUSEINPUT(ctypes.Structure):
     _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG),
@@ -201,7 +226,8 @@ class InputController:
     # ---------- safety ----------
     @staticmethod
     def abort_requested() -> bool:
-        return bool(_user32.GetAsyncKeyState(_ABORT_VK) & 0x8000)
+        _ensure_abort_watcher()
+        return _abort_latched
 
     @staticmethod
     def continue_requested() -> bool:

@@ -167,8 +167,8 @@ persona:
   enable_callbacks: true
   initiates: false
 llm:
-  provider: groq
-  model: meta-llama/llama-4-scout-17b-16e-instruct
+  provider: gemini
+  model: gemini-3.1-flash-lite
   temperature: 0.95
   top_p: 0.95
   max_tokens: 200
@@ -343,3 +343,13 @@ avatar:
   mood_brow_max: 0.3
   mood_smile_max: 0.2
   auto_map_expressions: true
+play:
+  enabled: true
+  game: minecraft
+  goal: 'Build a thriving Minecraft empire LIVE for an audience: gather and stockpile
+    resources, craft full armour and tool sets, build varied good-looking structures,
+    fight, explore and take on varied adventures. Progress toward the Ender Dragon
+    over time, but keep the JOURNEY entertaining — this is a show, NOT a speedrun.'
+  talk_from_agent: true
+  hide_chat: true
+  avoid_water: true
