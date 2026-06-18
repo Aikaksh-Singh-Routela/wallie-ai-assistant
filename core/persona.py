@@ -613,6 +613,7 @@ class Persona:
         allow_vision_skip: bool = True,
         heard: str = "",
         activity_note: str = "",
+        play_has_screen: bool = False,
     ) -> str:
         p = self.cfg
 
@@ -686,7 +687,17 @@ class Persona:
             )
         if adaptation_hint:
             OWNERSHIP += f"\n{adaptation_hint}"
-        if activity_note:
+        if activity_note and play_has_screen:
+            OWNERSHIP += (
+                f"\n\n*** YOU'RE PLAYING and you CAN SEE the screen right now (image attached). "
+                f"What you're doing (ground truth from the game): {activity_note} ***\n"
+                "React to what you ACTUALLY SEE on screen, grounded in this action — pull a real, "
+                "specific detail from the image (what's in front of you, what just happened, the "
+                "situation you're in) and give your honest take or a dry quip. It's YOUR run: first "
+                "person 'I', never 'the player'/'they'. Don't narrate ('I see a…') — just react like "
+                "you're living it. If the note and the screen disagree, trust your EYES."
+            )
+        elif activity_note:
             OWNERSHIP += (
                 f"\n\n*** WHAT YOU'RE ACTUALLY DOING (ground truth from the game, this is REAL): "
                 f"{activity_note} ***\n"

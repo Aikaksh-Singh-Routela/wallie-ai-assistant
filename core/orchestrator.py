@@ -381,7 +381,7 @@ class Orchestrator:
                                             rationale="play: grounded agent commentary", is_fallback=True)
                 self._pending_directive = directive
                 logger.info(f"play: commentary ({reaction.value}) after {since_last_spoken:.0f}s")
-                return Intent(kind="vision", vision=self._play_vision_event(), urgent=False,
+                return Intent(kind="vision", vision=self._grab_play_event(), urgent=False,
                               vision_directive=directive)
             return Intent(kind="monologue", vision_directive=VisionDirective(
                 reaction=VisionReaction.SILENCE, target_sentences=0, rationale="play: quiet beat"))
@@ -537,9 +537,25 @@ class Orchestrator:
 
         return Intent(kind="monologue")
 
+    def _grab_play_event(self) -> "VisionEvent":
+        """Grab a FRESH game screenshot for Play-mode commentary, with its own capture so it works
+        even when the Vision toggle is OFF. This is what lets Wallie actually SEE what it's playing
+        (grounding the line in the real screen, not just the agent's text note)."""
+        try:
+            if getattr(self, "_play_cap", None) is None:
+                from vision.capture import ScreenCapture
+                self._play_cap = ScreenCapture(
+                    monitor_index=self._cfg.vision.monitor_index, max_edge_px=768, jpeg_quality=60)
+            frame = self._play_cap.grab()
+            from vision.vision_loop import VisionEvent
+            return VisionEvent(frame=frame, changed=True,
+                               change_type=ChangeType.DELTA, activity=ScreenActivity.MEDIA)
+        except Exception as e:
+            logger.debug(f"play: screen grab failed ({e}); commenting from note only")
+            return self._play_vision_event()
+
     def _play_vision_event(self) -> "VisionEvent":
-        """A stand-in event for Play-mode commentary. The image is dropped (play mode grounds the
-        line in the agent's activity note), so a blank frame is fine when no real frame exists."""
+        """Fallback stand-in event when no real frame can be grabbed (blank frame -> note-only line)."""
         if self._latest_frame is not None:
             return self._latest_frame
         from vision.vision_loop import VisionEvent
@@ -1279,6 +1295,7 @@ class Orchestrator:
                 mode = "tangent"
             else:
                 mode = intent.vision.change_type.value  # "scene" | "delta"
+            has_img = bool(intent.vision.frame.jpeg)
             return (
                 self._persona.vision_turn(
                     change_type=mode,
@@ -1294,9 +1311,10 @@ class Orchestrator:
                     allow_vision_skip=self._cfg.llm.allow_vision_skip,
                     heard=self._fresh_heard(),
                     activity_note=play_note,
+                    play_has_screen=bool(play_note) and has_img,
                 ),
-                ([] if play_note
-                 else [ImageBlock(data=await self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")]),
+                ([ImageBlock(data=await self._downscale_for_llm(intent.vision.frame.jpeg), mime="image/jpeg")]
+                 if has_img else []),
                 "vision",
             )
         if intent.kind == "hearing":

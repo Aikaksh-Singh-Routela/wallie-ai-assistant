@@ -28,6 +28,7 @@ class OpenAICompatProvider(LLMProvider):
         base_url: str | None = None,
         supports_vision: bool = False,
         extra_headers: dict[str, str] | None = None,
+        timeout: float = _REQUEST_TIMEOUT_SEC,
     ) -> None:
         if not api_key:
             raise LLMError(f"{name}: missing API key")
@@ -44,7 +45,7 @@ class OpenAICompatProvider(LLMProvider):
             api_key=api_key,
             base_url=base_url,
             default_headers=extra_headers or None,
-            timeout=_REQUEST_TIMEOUT_SEC,  # fail fast instead of hanging for minutes
+            timeout=timeout,               # configurable: local models on a shared GPU can be slow
             max_retries=0,                 # we do our own (stream-aware) retry below
         )
 

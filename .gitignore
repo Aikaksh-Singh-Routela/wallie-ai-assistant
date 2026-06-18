@@ -58,3 +58,11 @@ wallie_house.schem
 
 # Internal analysis (not product code)
 scripts/star_forecast.py
+# Experimental — pipelined screen player (not part of Wallie)
+scripts/run_screen_player.py
+control/depth.py
+control/detector.py
+control/navigator.py
+control/pathfinder.py
+control/perception.py
+control/tracker.py

@@ -823,7 +823,7 @@ class WallieAgent:
             coal = int(inv.get("coal", 0) or 0)
             torches = int(inv.get("torch", 0) or 0)
             if coal < 6 and torches < 12:
-                self._chat("#mine 10 coal_ore")
+                self._chat("#mine 10 coal_ore deepslate_coal_ore")
                 await self._wait_baritone_idle(max_sec=220)
                 self._chat("#stop"); time.sleep(0.3)
             if torches < 12:
@@ -831,7 +831,8 @@ class WallieAgent:
                 await self._idle(5)
             self._chat(f"#goto {int(w.get('x', 0) or 0)} -59 {int(w.get('z', 0) or 0)}")
             await self._wait_baritone_idle(max_sec=300)
-            self._chat(f"#mine {amt} diamond_ore")
+            # at y-59 diamonds are the DEEPSLATE variant — must mine both names or it finds nothing
+            self._chat(f"#mine {amt} diamond_ore deepslate_diamond_ore")
             await self._wait_baritone_idle(max_sec=400)
             outcome = f"mine_diamonds {amt} (coal+torch first)"
         elif t == "setup_base":
