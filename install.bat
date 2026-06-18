@@ -91,8 +91,7 @@ if not exist "voices" mkdir voices
 
 echo.
 echo   ========================================
-echo        Setup complete!
-echo        Double-click start.bat to launch.
+echo        Setup complete! Launching Wallie...
 echo   ========================================
 echo.
-pause
+call start.bat

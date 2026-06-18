@@ -29,16 +29,11 @@ Everything you need to set up, configure, and run Wallie. If something isn't cov
 
 ## Installation
 
-### Windows
+### Windows — just double-click `start.bat`
 
-```
-git clone https://github.com/Alradyin/wallie-V2.git
-cd wallie-V2
-```
+[Download the ZIP](https://github.com/Alradyin/wallie-V2/archive/refs/heads/main.zip) and unzip it (or `git clone https://github.com/Alradyin/wallie-V2.git`), then **double-click `start.bat`**.
 
-Double-click **`install.bat`**, then **`start.bat`**. The dashboard opens at `http://127.0.0.1:8765`.
-
-> `start.bat` auto-installs on first run, so you can skip `install.bat` if you prefer.
+That's it. The first run installs everything it needs (Python included, if missing), then opens the dashboard at `http://127.0.0.1:8765`. Paste your API key there and hit Start.
 
 ### macOS / Linux
 
@@ -51,7 +46,9 @@ chmod +x start.sh
 
 ### Requirements
 
-- **Python 3.11+** (3.12 recommended)
+Nothing to install by hand — `start.bat` handles it. For reference:
+
+- **Python 3.11+** (auto-installed on Windows if missing)
 - No GPU required — everything runs on CPU + external APIs
 - ~200 MB disk space (excluding Python/venv)
 - Internet connection (unless using Piper + Ollama for a fully offline setup)

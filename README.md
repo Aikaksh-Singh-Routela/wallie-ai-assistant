@@ -227,28 +227,17 @@ Three columns: navigation, section editor, live status. Test any configuration c
 
 ## Quick start
 
-### One-click setup
+### Just double-click `start.bat`
 
-Clone and double-click. No Python knowledge needed.
+No Python knowledge, no terminal, no setup steps. Download → double-click → done.
 
-**Windows:**
-```
-git clone https://github.com/Alradyin/wallie-V2.git
-cd wallie-V2
-```
-Double-click **`install.bat`** → then **`start.bat`**. Dashboard opens at `http://127.0.0.1:8765`.
+1. **[Download the ZIP](https://github.com/Alradyin/wallie-V2/archive/refs/heads/main.zip)** and unzip it (or `git clone https://github.com/Alradyin/wallie-V2.git`).
+2. **Double-click `start.bat`.** First run installs everything it needs, then the dashboard opens at `http://127.0.0.1:8765`.
+3. **Paste your API key** in the dashboard → pick a model → hit **Start**.
 
-> `start.bat` auto-installs on first run — you can skip `install.bat` entirely.
+That's the whole setup. Everything else is configured in the browser.
 
-**macOS / Linux:**
-```bash
-git clone https://github.com/Alradyin/wallie-V2.git
-cd wallie-V2
-chmod +x start.sh
-./start.sh
-```
-
-That's it. Everything else happens in the browser.
+> **macOS / Linux:** run `./start.sh` instead (`chmod +x start.sh` once).
 
 ### Pick your budget
 
