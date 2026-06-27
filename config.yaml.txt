@@ -1,0 +1,40 @@
+llm:
+  provider: google
+  model: gemini-2.0-flash-exp
+  temperature: 0.8
+  max_tokens: 250
+
+tts:
+  provider: edge
+  voice: en-US-JennyNeural
+  speed: 1.0
+
+persona:
+  name: Wallie
+  language: English
+  age_range: early 20s
+  archetype: variety streamer
+  backstory: A chronically online streamer who has seen every weird corner of the internet and is mildly amused by all of it.
+
+orchestrator:
+  idle_interval: 45
+  segment_length: 2
+  max_segments: 15
+
+memory:
+  enabled: true
+  file: default.memory.json
+
+audio:
+  device: default
+  sample_rate: 22050
+
+vision:
+  enabled: false
+
+chat:
+  enabled: false
+
+dashboard:
+  host: 127.0.0.1
+  port: 8765

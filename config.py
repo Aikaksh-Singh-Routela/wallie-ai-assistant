@@ -128,11 +128,13 @@ class PersonaConfig(BaseModel):
 # Other subsystems
 # -------------------------------------------------------------------
 class LLMConfig(BaseModel):
+    # CHANGED: provider changed from "groq" to "gemini"
     provider: Literal["openai", "groq", "openrouter", "anthropic", "gemini", "ollama"] = "groq"
-    model: str = "llama-3.3-70b-versatile"
+    # CHANGED: model changed from "llama-3.3-70b-versatile" to "gemini-2.0-flash-exp"
+    model: str = "llama-3.1-8b-instant"
     temperature: float = 0.85
     top_p: float = 0.95
-    max_tokens: int = 350
+    max_tokens: int = 500
     presence_penalty: float = 0.3
     frequency_penalty: float = 0.4
     vision_capable: bool = False
@@ -142,8 +144,10 @@ class LLMConfig(BaseModel):
 
 
 class TTSConfig(BaseModel):
-    provider: Literal["fish", "elevenlabs", "piper", "kokoro"] = "fish"
-    voice_id: str = ""
+    # CHANGED: provider changed to "fish"
+    provider: Literal["fish", "elevenlabs", "piper", "kokoro", "edge"] = "piper"
+    # CHANGED: voice_id set to a default Fish TTS voice
+    voice_id: str = "en-US-JennyNeural"
     sample_rate: int = 24000
     # Output device for Wallie's voice. "" = system default. Accepts a device index
     # or a name substring, e.g. "CABLE Input" to route TTS into VRChat via VB-CABLE.
@@ -156,7 +160,8 @@ class TTSConfig(BaseModel):
     # Server-side text buffer before audio generation. Lower = faster time-to-first-audio
     # (snappier reactions), higher = smoother prosody. Range 100-300; 100 favors latency.
     fish_chunk_length: int = 100
-    piper_model_path: str = ""
+    # CHANGED: Set the path to the Piper voice file you downloaded
+    piper_model_path: str = "voices/en_US-amy-medium.onnx"
     piper_length_scale: float = 1.0
     # Kokoro — local, high-quality neural TTS (free, runs on CPU/GPU). voice e.g.
     # af_heart / am_adam / bf_emma; lang_code 'a'=US English, 'b'=UK. speed 0.5-2.0.
@@ -245,10 +250,24 @@ class ChatConfig(BaseModel):
 
 class TopicConfig(BaseModel):
     mode: Literal["list", "ai_picks"] = "ai_picks"
+    # ===== ADDED MORE TOPICS =====
     topics: list[str] = Field(default_factory=lambda: [
-        "Artificial intelligence and the future",
-        "Strange decisions from tech companies",
-        "Absurd observations from everyday life",
+        "Artificial intelligence and the future of humanity",
+        "Gaming and streaming culture trends",
+        "Internet memes and viral sensations",
+        "Tech innovations and everyday gadgets",
+        "Life as a variety streamer",
+        "Weird and wonderful internet rabbit holes",
+        "Video game design and storytelling",
+        "The evolution of social media platforms",
+        "Digital nomad lifestyle and remote work",
+        "Creative content creation tips and tricks",
+        "Sci-fi and futuristic technologies",
+        "Pop culture and entertainment news",
+        "Mental health and wellness in the digital age",
+        "The rise of AI in creative fields",
+        "Exploring niche subcultures online",
+        "The future of virtual reality and gaming",
     ])
     switch_min_sec: float = 90.0
     switch_chance: float = 0.15

@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wallie · Control Room</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <style>
+  /* ===== First-run setup wizard (self-contained, .wz- scoped) ===== */
+  [x-cloak]{display:none!important}
+  .wz-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:rgba(4,4,10,.74);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .wz-card{width:100%;max-width:620px;max-height:92vh;overflow:auto;background:linear-gradient(180deg,#10101f,#0b0b16);border:1px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:0 40px 120px rgba(0,0,0,.6),0 0 0 1px rgba(138,155,255,.08);color:#f5f6fb;font-family:inherit}
+  .wz-head{display:flex;align-items:center;justify-content:space-between;padding:1.5rem 1.75rem 1rem}
+  .wz-steps{display:flex;gap:.5rem;align-items:center}
+  .wz-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;background:rgba(255,255,255,.07);color:#8a8caa;border:1px solid rgba(255,255,255,.08);transition:.2s}
+  .wz-dot.on{background:linear-gradient(120deg,#5fd0ff,#b18cff);color:#06060e;border-color:transparent}
+  .wz-dot.done{background:rgba(95,208,255,.18);color:#5fd0ff}
+  .wz-x{background:none;border:none;color:#8a8caa;font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .4rem;border-radius:8px}
+  .wz-x:hover{color:#fff;background:rgba(255,255,255,.06)}
+  .wz-body{padding:.5rem 1.75rem 1.5rem}
+  .wz-title{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:.4rem 0 .35rem}
+  .wz-sub{color:#a8aac4;font-size:.95rem;line-height:1.55;margin-bottom:1.4rem}
+  .wz-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+  .wz-opt{text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.1rem 1.2rem;cursor:pointer;transition:.2s;color:inherit;font-family:inherit}
+  .wz-opt:hover{border-color:rgba(138,155,255,.55);background:rgba(138,155,255,.08);transform:translateY(-2px)}
+  .wz-opt.sel{border-color:#8a9bff;background:rgba(138,155,255,.12)}
+  .wz-opt h4{font-size:1.02rem;font-weight:700;margin:0 0 .25rem;display:flex;align-items:center;gap:.45rem}
+  .wz-opt p{font-size:.84rem;color:#a8aac4;line-height:1.45;margin:0}
+  .wz-badge{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:.12rem .5rem;border-radius:980px;background:rgba(95,208,255,.16);color:#5fd0ff}
+  .wz-price{font-size:.78rem;color:#6b6d88;margin-top:.5rem}
+  .wz-keyrow{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.1rem 1.2rem;margin-bottom:.8rem}
+  .wz-keyrow .wz-kh{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+  .wz-keyrow label{font-weight:600;font-size:.95rem}
+  .wz-getlink{font-size:.8rem;color:#5fd0ff;text-decoration:none;white-space:nowrap}
+  .wz-getlink:hover{text-decoration:underline}
+  .wz-inrow{display:flex;gap:.5rem}
+  .wz-inrow input{flex:1;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:.6rem .8rem;color:#fff;font-size:.9rem;font-family:inherit;outline:none}
+  .wz-inrow input:focus{border-color:#8a9bff}
+  .wz-msg{font-size:.82rem;margin-top:.5rem}
+  .wz-msg.ok{color:#34d399}
+  .wz-msg.bad{color:#f87171}
+  .wz-note{font-size:.82rem;color:#a8aac4;background:rgba(95,208,255,.07);border:1px solid rgba(95,208,255,.16);border-radius:12px;padding:.8rem 1rem;line-height:1.5;margin-top:.4rem}
+  .wz-foot{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 1.75rem 1.6rem;border-top:1px solid rgba(255,255,255,.07)}
+  .wz-btn{border:none;cursor:pointer;font-family:inherit;font-weight:700;font-size:.95rem;padding:.7rem 1.5rem;border-radius:980px;transition:.2s}
+  .wz-btn.primary{background:linear-gradient(120deg,#5fd0ff,#8a9bff 50%,#b18cff);color:#06060e}
+  .wz-btn.primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .wz-btn.primary:disabled{opacity:.4;cursor:not-allowed;filter:none;transform:none}
+  .wz-btn.ghost{background:rgba(255,255,255,.06);color:#d6d8ea}
+  .wz-btn.ghost:hover{background:rgba(255,255,255,.1)}
+  .wz-skip{background:none;border:none;color:#6b6d88;font-size:.85rem;cursor:pointer;font-family:inherit}
+  .wz-skip:hover{color:#a8aac4}
+  .wz-done{text-align:center;padding:1rem 0 .5rem}
+  .wz-done .wz-check{font-size:3rem;margin-bottom:.5rem}
+  .wz-setup-btn{background:rgba(138,155,255,.14)!important;border:1px solid rgba(138,155,255,.3)!important}
+  @media(max-width:560px){.wz-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body x-data="app()" x-init="init()" :class="{ 'drawer-open': drawerOpen }">
+
+<!-- ============ TOP BAR ============ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-text">
+      <div class="brand-name">WALLIE</div>
+      <div class="brand-sub">control room</div>
+    </div>
+  </div>
+
+  <div class="topbar-center">
+    <div class="profile-picker">
+      <label>Profile</label>
+      <select x-model="activeProfile" @change="switchProfile($event.target.value)">
+        <template x-for="p in profiles" :key="p"><option :value="p" x-text="p"></option></template>
+      </select>
+      <button class="icon-btn" title="New profile" @click="promptNewProfile()">＋</button>
+      <button class="icon-btn" title="Clone current" @click="promptCloneProfile()">⎘</button>
+      <button class="icon-btn danger" title="Delete current" @click="confirmDeleteProfile()" x-show="profiles.length > 1">🗑</button>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+    <div class="status-pill" :class="running ? 'on' : 'off'">
+      <span class="dot"></span>
+      <span x-text="running ? 'LIVE' : 'IDLE'"></span>
+    </div>
+    <button class="btn primary" x-show="!running" @click="start">Start</button>
+    <button class="btn warn" x-show="running" @click="stop">Stop</button>
+    <button class="btn ghost panic" x-show="running" @click="resetAudio()" title="Flush audio buffer (kills static / stuck playback)">⚠ reset audio</button>
+    <button class="btn ghost wz-setup-btn" @click="openWizard()" title="Setup wizard">✨ Setup</button>
+    <button class="btn ghost" @click="drawerOpen = !drawerOpen" title="Toggle live panel">
+      <span x-text="drawerOpen ? '›' : '‹'"></span>
+    </button>
+  </div>
+</header>
+
+<!-- ============ BODY ============ -->
+<div class="app">
+
+  <!-- sidebar nav -->
+  <nav class="sidenav">
+    <template x-for="s in sections" :key="s.id">
+      <button class="nav-item" :class="{ active: section === s.id }" @click="section = s.id">
+        <span class="nav-ico" x-text="s.ico"></span>
+        <span class="nav-label" x-text="s.label"></span>
+      </button>
+    </template>
+    <div class="nav-spacer"></div>
+    <button class="nav-item save-nav" @click="save()">
+      <span class="nav-ico">💾</span>
+      <span class="nav-label">Save</span>
+      <span class="save-chip" x-show="saveMsg" x-text="saveMsg"></span>
+    </button>
+  </nav>
+
+  <!-- main panel -->
+  <main class="pane">
+
+    <!-- ============ IDENTITY ============ -->
+    <section x-show="section==='identity'" class="section">
+      <header class="section-head">
+        <h2>Identity</h2>
+        <p>Who is your streamer? These anchor every sentence they say.</p>
+      </header>
+      <div class="grid two">
+        <div class="field">
+          <label>Name</label>
+          <input x-model="cfg.persona.name" placeholder="Wallie" />
+        </div>
+        <div class="field">
+          <label>Handle</label>
+          <input x-model="cfg.persona.handle" placeholder="@wallie" />
+        </div>
+        <div class="field">
+          <label>Language</label>
+          <select x-model="cfg.persona.language">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="pt">Portuguese</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            <option value="zh">Chinese</option>
+            <option value="ru">Russian</option>
+            <option value="it">Italian</option>
+            <option value="nl">Dutch</option>
+            <option value="pl">Polish</option>
+            <option value="ar">Arabic</option>
+            <option value="tr">Turkish</option>
+            <option value="hi">Hindi</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Pronouns</label>
+          <input x-model="cfg.persona.pronouns" placeholder="they/them" />
+        </div>
+        <div class="field">
+          <label>Age range (tone)</label>
+          <input x-model="cfg.persona.age_range" placeholder="early 20s" />
+        </div>
+        <div class="field">
+          <label>Origin</label>
+          <input x-model="cfg.persona.origin" placeholder="somewhere online" />
+        </div>
+        <div class="field wide">
+          <label>Archetype</label>
+          <input x-model="cfg.persona.archetype" placeholder="variety streamer / esports caster / video essayist" />
+        </div>
+        <div class="field wide">
+          <label>Backstory</label>
+          <textarea rows="4" x-model="cfg.persona.backstory" placeholder="A chronically online streamer who has seen everything."></textarea>
+          <small class="hint">A few sentences of backstory. Pasted verbatim into the system prompt.</small>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PERSONALITY ============ -->
+    <section x-show="section==='personality'" class="section">
+      <header class="section-head">
+        <h2>Personality</h2>
+        <p>How they talk, not what they talk about.</p>
+      </header>
+
+      <div class="field">
+        <label>Energy</label>
+        <div class="segmented wide-seg">
+          <template x-for="v in ['chill','warm','hyped','unhinged']" :key="v">
+            <button :class="{on: cfg.persona.energy===v}" @click="cfg.persona.energy=v" x-text="v"></button>
+          </template>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Humor style <small class="hint">(pick any)</small></label>
+        <div class="chips">
+          <template x-for="h in humorOptions" :key="h">
+            <button class="chip toggle"
+              :class="{on: cfg.persona.humor_style.includes(h)}"
+              @click="toggleInList(cfg.persona.humor_style, h)"
+              x-text="h.replace('_',' ')"></button>
+          </template>
+        </div>
+      </div>
+
+      <div class="grid three">
+        <div class="field">
+          <label>Profanity</label>
+          <div class="segmented">
+            <button :class="{on: cfg.persona.profanity==='none'}" @click="cfg.persona.profanity='none'">none</button>
+            <button :class="{on: cfg.persona.profanity==='mild'}" @click="cfg.persona.profanity='mild'">mild</button>
+            <button :class="{on: cfg.persona.profanity==='heavy'}" @click="cfg.persona.profanity='heavy'">heavy</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Formality</label>
+          <div class="segmented">
+            <button :class="{on: cfg.persona.formality==='street'}" @click="cfg.persona.formality='street'">street</button>
+            <button :class="{on: cfg.persona.formality==='casual'}" @click="cfg.persona.formality='casual'">casual</button>
+            <button :class="{on: cfg.persona.formality==='formal'}" @click="cfg.persona.formality='formal'">formal</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Sentence length</label>
+          <div class="segmented">
+            <button :class="{on: cfg.persona.sentence_length==='short'}" @click="cfg.persona.sentence_length='short'">short</button>
+            <button :class="{on: cfg.persona.sentence_length==='medium'}" @click="cfg.persona.sentence_length='medium'">medium</button>
+            <button :class="{on: cfg.persona.sentence_length==='mixed'}" @click="cfg.persona.sentence_length='mixed'">mixed</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid three toggles">
+        <label class="toggle-row">
+          <span>Strong opinions</span>
+          <input type="checkbox" class="switch" x-model="cfg.persona.strong_opinions" />
+        </label>
+        <label class="toggle-row">
+          <span>Admit uncertainty</span>
+          <input type="checkbox" class="switch" x-model="cfg.persona.admit_uncertainty" />
+        </label>
+        <label class="toggle-row">
+          <span>Break 4th wall</span>
+          <input type="checkbox" class="switch" x-model="cfg.persona.break_fourth_wall" />
+        </label>
+      </div>
+
+      <div class="field">
+        <label>Catchphrases</label>
+        <div class="chip-input" x-data="chipInput(() => cfg.persona.catchphrases)">
+          <template x-for="(it, i) in model()" :key="i">
+            <span class="chip"><span x-text="it"></span><button @click="remove(i)">×</button></span>
+          </template>
+          <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Running gags</label>
+        <div class="chip-input" x-data="chipInput(() => cfg.persona.running_gags)">
+          <template x-for="(it, i) in model()" :key="i">
+            <span class="chip"><span x-text="it"></span><button @click="remove(i)">×</button></span>
+          </template>
+          <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Never say</label>
+        <div class="chip-input" x-data="chipInput(() => cfg.persona.banned_words)">
+          <template x-for="(it, i) in model()" :key="i">
+            <span class="chip danger"><span x-text="it"></span><button @click="remove(i)">×</button></span>
+          </template>
+          <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
+        </div>
+      </div>
+      <div class="grid two">
+        <div class="field">
+          <label>Favorite topics</label>
+          <div class="chip-input" x-data="chipInput(() => cfg.persona.favorite_topics)">
+            <template x-for="(it, i) in model()" :key="i">
+              <span class="chip ok"><span x-text="it"></span><button @click="remove(i)">×</button></span>
+            </template>
+            <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Taboo topics</label>
+          <div class="chip-input" x-data="chipInput(() => cfg.persona.taboo_topics)">
+            <template x-for="(it, i) in model()" :key="i">
+              <span class="chip warn"><span x-text="it"></span><button @click="remove(i)">×</button></span>
+            </template>
+            <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Extra style notes</label>
+        <textarea rows="3" x-model="cfg.persona.extra_style_notes" placeholder="Anything you couldn't express above."></textarea>
+      </div>
+
+      <div class="test-strip">
+        <button class="btn primary" @click="testPersona('monologue')" :disabled="testing">Test monologue</button>
+        <button class="btn" @click="testPersona('chat')" :disabled="testing">Test chat reply</button>
+        <button class="btn" @click="testPersona('vision')" :disabled="testing" :title="cfg.llm.vision_capable ? '' : 'Enable a vision-capable model first'">Test vision line</button>
+        <div class="test-out" x-show="testResult">
+          <div class="test-label">Sample output</div>
+          <div class="test-text" x-text="testResult"></div>
+          <div class="test-actions" x-show="testResult">
+            <button class="btn tiny" @click="speakTest()">▶ speak this</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VOICE ============ -->
+    <section x-show="section==='voice'" class="section">
+      <header class="section-head">
+        <h2>Voice</h2>
+        <p>Synthesis provider, voice ID, and delivery knobs.</p>
+      </header>
+      <div class="grid two">
+        <div class="field">
+          <label>Provider</label>
+          <div class="segmented">
+            <button :class="{on: cfg.tts.provider==='fish'}" @click="cfg.tts.provider='fish'">Fish Audio</button>
+            <button :class="{on: cfg.tts.provider==='elevenlabs'}" @click="cfg.tts.provider='elevenlabs'">ElevenLabs</button>
+            <button :class="{on: cfg.tts.provider==='piper'}" @click="cfg.tts.provider='piper'">Piper (local · free)</button>
+            <button :class="{on: cfg.tts.provider==='kokoro'}" @click="cfg.tts.provider='kokoro'">Kokoro (local · free)</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Voice ID / Reference ID</label>
+          <input x-model="cfg.tts.voice_id" placeholder="voice id from your TTS dashboard" />
+        </div>
+        <div class="field">
+          <label>Sample rate</label>
+          <div class="segmented">
+            <template x-for="sr in [16000,22050,24000,44100]" :key="sr">
+              <button :class="{on: cfg.tts.sample_rate===sr}" @click="cfg.tts.sample_rate=sr" x-text="sr"></button>
+            </template>
+          </div>
+        </div>
+        <div class="field" x-show="cfg.tts.provider==='fish'">
+          <label>Fish latency mode</label>
+          <div class="segmented">
+            <button :class="{on: cfg.tts.fish_latency_mode==='balanced'}" @click="cfg.tts.fish_latency_mode='balanced'">balanced (fast)</button>
+            <button :class="{on: cfg.tts.fish_latency_mode==='normal'}" @click="cfg.tts.fish_latency_mode='normal'">normal (quality)</button>
+          </div>
+        </div>
+        <template x-if="cfg.tts.provider==='elevenlabs'">
+          <div class="field wide">
+            <label>ElevenLabs model</label>
+            <input x-model="cfg.tts.el_model_id" placeholder="eleven_turbo_v2_5" />
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='elevenlabs'">
+          <div class="field">
+            <label>Stability <span class="slider-val" x-text="cfg.tts.el_stability.toFixed(2)"></span></label>
+            <input type="range" min="0" max="1" step="0.01" x-model.number="cfg.tts.el_stability" />
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='elevenlabs'">
+          <div class="field">
+            <label>Similarity <span class="slider-val" x-text="cfg.tts.el_similarity_boost.toFixed(2)"></span></label>
+            <input type="range" min="0" max="1" step="0.01" x-model.number="cfg.tts.el_similarity_boost" />
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='elevenlabs'">
+          <div class="field">
+            <label>Style <span class="slider-val" x-text="cfg.tts.el_style.toFixed(2)"></span></label>
+            <input type="range" min="0" max="1" step="0.01" x-model.number="cfg.tts.el_style" />
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='piper'">
+          <div class="field wide">
+            <label>Piper voice model path</label>
+            <input x-model="cfg.tts.piper_model_path" placeholder="voices/en_US-amy-medium.onnx" />
+            <small class="hint">
+              Download with: <code>python scripts/download_piper_voice.py en_US-amy-medium</code>.
+              Browse voices at <a href="https://huggingface.co/rhasspy/piper-voices" target="_blank">huggingface.co/rhasspy/piper-voices</a>.
+            </small>
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='piper'">
+          <div class="field">
+            <label>Speed (length scale) <span class="slider-val" x-text="cfg.tts.piper_length_scale.toFixed(2)"></span></label>
+            <input type="range" min="0.6" max="1.6" step="0.05" x-model.number="cfg.tts.piper_length_scale" />
+            <small class="hint">1.0 = normal · &lt;1 faster · &gt;1 slower</small>
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='kokoro'">
+          <div class="field wide">
+            <label>Kokoro voice</label>
+            <input x-model="cfg.tts.kokoro_voice" placeholder="af_heart" />
+            <small class="hint">
+              e.g. <code>af_heart</code>, <code>af_bella</code>, <code>am_adam</code>, <code>bf_emma</code> (a=US, b=UK · f=female, m=male).
+              Needs: <code>pip install kokoro soundfile</code> (uses PyTorch). No API key.
+            </small>
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='kokoro'">
+          <div class="field">
+            <label>Language</label>
+            <div class="segmented">
+              <button :class="{on: cfg.tts.kokoro_lang_code==='a'}" @click="cfg.tts.kokoro_lang_code='a'">US English</button>
+              <button :class="{on: cfg.tts.kokoro_lang_code==='b'}" @click="cfg.tts.kokoro_lang_code='b'">UK English</button>
+            </div>
+          </div>
+        </template>
+        <template x-if="cfg.tts.provider==='kokoro'">
+          <div class="field">
+            <label>Speed <span class="slider-val" x-text="cfg.tts.kokoro_speed.toFixed(2)"></span></label>
+            <input type="range" min="0.5" max="2.0" step="0.05" x-model.number="cfg.tts.kokoro_speed" />
+          </div>
+        </template>
+      </div>
+
+      <div class="test-strip">
+        <input class="test-input" x-model="voiceTestText" placeholder="Type a line to test the voice..." />
+        <button class="btn primary" @click="testVoice()" :disabled="!voiceTestText || testing">▶ Play</button>
+      </div>
+    </section>
+
+    <!-- ============ AVATAR ============ -->
+    <section x-show="section==='avatar'" class="section">
+      <header class="section-head">
+        <h2>Avatar</h2>
+        <p>VTube Studio integration. Lipsync, idle motion and expression triggers driven by the speech pipeline.</p>
+      </header>
+
+      <label class="toggle-row big">
+        <span>Enable VTube Studio avatar</span>
+        <input type="checkbox" class="switch" x-model="cfg.avatar.enabled" />
+      </label>
+
+      <div class="vts-status" :class="avatarStatus.connected ? 'on' : 'off'">
+        <span class="dot"></span>
+        <div class="vts-status-text">
+          <strong x-text="avatarStatus.connected ? 'CONNECTED' : (avatarStatus.enabled ? 'WAITING FOR VTS…' : 'DISABLED')"></strong>
+          <small x-text="avatarStatus.host || 'no host'"></small>
+        </div>
+        <div class="vts-status-meta" x-show="avatarStatus.connected">
+          <span x-text="avatarStatus.model || '?'"></span> ·
+          <span x-text="(avatarStatus.hotkey_count || 0) + ' hotkeys'"></span> ·
+          <span x-text="formatHMS(avatarStatus.uptime_sec) + ' up'"></span>
+        </div>
+      </div>
+
+      <div class="grid two" x-show="cfg.avatar.enabled">
+        <div class="field">
+          <label>VTS host</label>
+          <input x-model="cfg.avatar.vts_host" placeholder="127.0.0.1" />
+        </div>
+        <div class="field">
+          <label>VTS port</label>
+          <input type="number" x-model.number="cfg.avatar.vts_port" />
+        </div>
+      </div>
+
+      <h3 class="subhead">Lipsync</h3>
+      <div class="grid three">
+        <div class="field">
+          <label>Gain <span class="slider-val" x-text="cfg.avatar.lipsync_gain.toFixed(2)"></span></label>
+          <input type="range" min="1" max="10" step="0.1" x-model.number="cfg.avatar.lipsync_gain" />
+          <small class="hint">Boost the raw RMS. Higher = mouth moves more.</small>
+        </div>
+        <div class="field">
+          <label>Ceiling <span class="slider-val" x-text="cfg.avatar.lipsync_ceiling.toFixed(2)"></span></label>
+          <input type="range" min="0.4" max="1" step="0.01" x-model.number="cfg.avatar.lipsync_ceiling" />
+          <small class="hint">Max MouthOpen value.</small>
+        </div>
+        <div class="field">
+          <label>Floor <span class="slider-val" x-text="cfg.avatar.lipsync_floor.toFixed(3)"></span></label>
+          <input type="range" min="0" max="0.1" step="0.005" x-model.number="cfg.avatar.lipsync_floor" />
+          <small class="hint">Below this RMS, mouth stays closed.</small>
+        </div>
+        <div class="field">
+          <label>Attack <span class="slider-val" x-text="cfg.avatar.lipsync_attack.toFixed(2)"></span></label>
+          <input type="range" min="0.05" max="1" step="0.01" x-model.number="cfg.avatar.lipsync_attack" />
+          <small class="hint">How fast the mouth opens (1 = instant).</small>
+        </div>
+        <div class="field">
+          <label>Release <span class="slider-val" x-text="cfg.avatar.lipsync_release.toFixed(2)"></span></label>
+          <input type="range" min="0.05" max="1" step="0.01" x-model.number="cfg.avatar.lipsync_release" />
+          <small class="hint">How fast the mouth closes (lower = smoother).</small>
+        </div>
+        <div class="field">
+          <label>Speaking smile <span class="slider-val" x-text="cfg.avatar.speaking_smile.toFixed(2)"></span></label>
+          <input type="range" min="0" max="0.6" step="0.01" x-model.number="cfg.avatar.speaking_smile" />
+          <small class="hint">Default smile while speaking. 0 = flat mouth.</small>
+        </div>
+      </div>
+
+      <h3 class="subhead">Viseme lip sync</h3>
+      <div class="grid three toggles">
+        <label class="toggle-row">
+          <span>Spectral mouth shape</span>
+          <input type="checkbox" class="switch" x-model="cfg.avatar.enable_viseme_lipsync" />
+        </label>
+        <div class="field">
+          <label>Smoothing <span class="slider-val" x-text="cfg.avatar.viseme_smoothing.toFixed(2)"></span></label>
+          <input type="range" min="0.05" max="0.8" step="0.05" x-model.number="cfg.avatar.viseme_smoothing" />
+          <small class="hint">How fast mouth shape follows audio. Higher = snappier.</small>
+        </div>
+        <div></div>
+      </div>
+
+      <h3 class="subhead">Idle motion</h3>
+      <div class="grid three toggles">
+        <label class="toggle-row">
+          <span>Head sway when silent</span>
+          <input type="checkbox" class="switch" x-model="cfg.avatar.enable_idle_motion" />
+        </label>
+        <label class="toggle-row">
+          <span>Eye darts</span>
+          <input type="checkbox

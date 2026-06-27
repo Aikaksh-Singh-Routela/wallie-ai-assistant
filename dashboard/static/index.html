@@ -7,53 +7,38 @@
   <link rel="stylesheet" href="/static/style.css" />
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <style>
-  /* ===== First-run setup wizard (self-contained, .wz- scoped) ===== */
   [x-cloak]{display:none!important}
-  .wz-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:rgba(4,4,10,.74);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-  .wz-card{width:100%;max-width:620px;max-height:92vh;overflow:auto;background:linear-gradient(180deg,#10101f,#0b0b16);border:1px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:0 40px 120px rgba(0,0,0,.6),0 0 0 1px rgba(138,155,255,.08);color:#f5f6fb;font-family:inherit}
-  .wz-head{display:flex;align-items:center;justify-content:space-between;padding:1.5rem 1.75rem 1rem}
-  .wz-steps{display:flex;gap:.5rem;align-items:center}
-  .wz-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;background:rgba(255,255,255,.07);color:#8a8caa;border:1px solid rgba(255,255,255,.08);transition:.2s}
-  .wz-dot.on{background:linear-gradient(120deg,#5fd0ff,#b18cff);color:#06060e;border-color:transparent}
-  .wz-dot.done{background:rgba(95,208,255,.18);color:#5fd0ff}
-  .wz-x{background:none;border:none;color:#8a8caa;font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .4rem;border-radius:8px}
-  .wz-x:hover{color:#fff;background:rgba(255,255,255,.06)}
-  .wz-body{padding:.5rem 1.75rem 1.5rem}
-  .wz-title{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:.4rem 0 .35rem}
-  .wz-sub{color:#a8aac4;font-size:.95rem;line-height:1.55;margin-bottom:1.4rem}
-  .wz-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
-  .wz-opt{text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.1rem 1.2rem;cursor:pointer;transition:.2s;color:inherit;font-family:inherit}
-  .wz-opt:hover{border-color:rgba(138,155,255,.55);background:rgba(138,155,255,.08);transform:translateY(-2px)}
-  .wz-opt.sel{border-color:#8a9bff;background:rgba(138,155,255,.12)}
-  .wz-opt h4{font-size:1.02rem;font-weight:700;margin:0 0 .25rem;display:flex;align-items:center;gap:.45rem}
-  .wz-opt p{font-size:.84rem;color:#a8aac4;line-height:1.45;margin:0}
-  .wz-badge{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:.12rem .5rem;border-radius:980px;background:rgba(95,208,255,.16);color:#5fd0ff}
-  .wz-price{font-size:.78rem;color:#6b6d88;margin-top:.5rem}
-  .wz-keyrow{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.1rem 1.2rem;margin-bottom:.8rem}
-  .wz-keyrow .wz-kh{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
-  .wz-keyrow label{font-weight:600;font-size:.95rem}
-  .wz-getlink{font-size:.8rem;color:#5fd0ff;text-decoration:none;white-space:nowrap}
-  .wz-getlink:hover{text-decoration:underline}
-  .wz-inrow{display:flex;gap:.5rem}
-  .wz-inrow input{flex:1;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:.6rem .8rem;color:#fff;font-size:.9rem;font-family:inherit;outline:none}
-  .wz-inrow input:focus{border-color:#8a9bff}
-  .wz-msg{font-size:.82rem;margin-top:.5rem}
-  .wz-msg.ok{color:#34d399}
-  .wz-msg.bad{color:#f87171}
-  .wz-note{font-size:.82rem;color:#a8aac4;background:rgba(95,208,255,.07);border:1px solid rgba(95,208,255,.16);border-radius:12px;padding:.8rem 1rem;line-height:1.5;margin-top:.4rem}
-  .wz-foot{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 1.75rem 1.6rem;border-top:1px solid rgba(255,255,255,.07)}
-  .wz-btn{border:none;cursor:pointer;font-family:inherit;font-weight:700;font-size:.95rem;padding:.7rem 1.5rem;border-radius:980px;transition:.2s}
-  .wz-btn.primary{background:linear-gradient(120deg,#5fd0ff,#8a9bff 50%,#b18cff);color:#06060e}
-  .wz-btn.primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
-  .wz-btn.primary:disabled{opacity:.4;cursor:not-allowed;filter:none;transform:none}
-  .wz-btn.ghost{background:rgba(255,255,255,.06);color:#d6d8ea}
-  .wz-btn.ghost:hover{background:rgba(255,255,255,.1)}
-  .wz-skip{background:none;border:none;color:#6b6d88;font-size:.85rem;cursor:pointer;font-family:inherit}
-  .wz-skip:hover{color:#a8aac4}
-  .wz-done{text-align:center;padding:1rem 0 .5rem}
-  .wz-done .wz-check{font-size:3rem;margin-bottom:.5rem}
-  .wz-setup-btn{background:rgba(138,155,255,.14)!important;border:1px solid rgba(138,155,255,.3)!important}
-  @media(max-width:560px){.wz-grid{grid-template-columns:1fr}}
+  /* Custom scrollbar for chat boxes - BRIGHT AND VISIBLE */
+  #chatResponseFloating::-webkit-scrollbar,
+  #chatResponse::-webkit-scrollbar {
+      width: 14px;
+      height: 14px;
+  }
+  #chatResponseFloating::-webkit-scrollbar-track,
+  #chatResponse::-webkit-scrollbar-track {
+      background: #0d0d1a;
+      border-radius: 8px;
+      border: 1px solid #555;
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+  }
+  #chatResponseFloating::-webkit-scrollbar-thumb,
+  #chatResponse::-webkit-scrollbar-thumb {
+      background: #7c5cfc;
+      border-radius: 8px;
+      border: 2px solid #b08cff;
+      box-shadow: 0 0 10px rgba(124, 92, 252, 0.5);
+  }
+  #chatResponseFloating::-webkit-scrollbar-thumb:hover,
+  #chatResponse::-webkit-scrollbar-thumb:hover {
+      background: #9b7cff;
+      border-color: #c8b0ff;
+  }
+  /* Firefox scrollbar - VISIBLE */
+  #chatResponseFloating,
+  #chatResponse {
+      scrollbar-width: auto;
+      scrollbar-color: #7c5cfc #0d0d1a;
+  }
   </style>
 </head>
 <body x-data="app()" x-init="init()" :class="{ 'drawer-open': drawerOpen }">
@@ -67,7 +52,6 @@
       <div class="brand-sub">control room</div>
     </div>
   </div>
-
   <div class="topbar-center">
     <div class="profile-picker">
       <label>Profile</label>
@@ -79,7 +63,6 @@
       <button class="icon-btn danger" title="Delete current" @click="confirmDeleteProfile()" x-show="profiles.length > 1">🗑</button>
     </div>
   </div>
-
   <div class="topbar-right">
     <div class="status-pill" :class="running ? 'on' : 'off'">
       <span class="dot"></span>
@@ -87,8 +70,9 @@
     </div>
     <button class="btn primary" x-show="!running" @click="start">Start</button>
     <button class="btn warn" x-show="running" @click="stop">Stop</button>
-    <button class="btn ghost panic" x-show="running" @click="resetAudio()" title="Flush audio buffer (kills static / stuck playback)">⚠ reset audio</button>
+    <button class="btn ghost panic" x-show="running" @click="resetAudio()" title="Flush audio buffer">⚠ reset audio</button>
     <button class="btn ghost wz-setup-btn" @click="openWizard()" title="Setup wizard">✨ Setup</button>
+    <button class="btn ghost" onclick="toggleChatBox()" title="Open Chat">💬 Chat</button>
     <button class="btn ghost" @click="drawerOpen = !drawerOpen" title="Toggle live panel">
       <span x-text="drawerOpen ? '›' : '‹'"></span>
     </button>
@@ -97,8 +81,6 @@
 
 <!-- ============ BODY ============ -->
 <div class="app">
-
-  <!-- sidebar nav -->
   <nav class="sidenav">
     <template x-for="s in sections" :key="s.id">
       <button class="nav-item" :class="{ active: section === s.id }" @click="section = s.id">
@@ -114,1164 +96,362 @@
     </button>
   </nav>
 
-  <!-- main panel -->
   <main class="pane">
-
     <!-- ============ IDENTITY ============ -->
-    <section x-show="section==='identity'" class="section">
-      <header class="section-head">
-        <h2>Identity</h2>
-        <p>Who is your streamer? These anchor every sentence they say.</p>
-      </header>
+    <div class="section" x-show="section==='identity'">
+      <header class="section-head"><h2>Identity</h2><p>Who is your streamer?</p></header>
       <div class="grid two">
-        <div class="field">
-          <label>Name</label>
-          <input x-model="cfg.persona.name" placeholder="Wallie" />
-        </div>
-        <div class="field">
-          <label>Handle</label>
-          <input x-model="cfg.persona.handle" placeholder="@wallie" />
-        </div>
-        <div class="field">
-          <label>Language</label>
-          <select x-model="cfg.persona.language">
-            <option value="en">English</option>
-            <option value="es">Spanish</option>
-            <option value="pt">Portuguese</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-            <option value="ja">Japanese</option>
-            <option value="ko">Korean</option>
-            <option value="zh">Chinese</option>
-            <option value="ru">Russian</option>
-            <option value="it">Italian</option>
-            <option value="nl">Dutch</option>
-            <option value="pl">Polish</option>
-            <option value="ar">Arabic</option>
-            <option value="tr">Turkish</option>
-            <option value="hi">Hindi</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Pronouns</label>
-          <input x-model="cfg.persona.pronouns" placeholder="they/them" />
-        </div>
-        <div class="field">
-          <label>Age range (tone)</label>
-          <input x-model="cfg.persona.age_range" placeholder="early 20s" />
-        </div>
-        <div class="field">
-          <label>Origin</label>
-          <input x-model="cfg.persona.origin" placeholder="somewhere online" />
-        </div>
-        <div class="field wide">
-          <label>Archetype</label>
-          <input x-model="cfg.persona.archetype" placeholder="variety streamer / esports caster / video essayist" />
-        </div>
-        <div class="field wide">
-          <label>Backstory</label>
-          <textarea rows="4" x-model="cfg.persona.backstory" placeholder="A chronically online streamer who has seen everything."></textarea>
-          <small class="hint">A few sentences of backstory. Pasted verbatim into the system prompt.</small>
-        </div>
+        <div class="field"><label>Name</label><input x-model="cfg.persona.name" placeholder="Wallie" /></div>
+        <div class="field"><label>Handle</label><input x-model="cfg.persona.handle" placeholder="@wallie" /></div>
+        <div class="field"><label>Language</label><select x-model="cfg.persona.language"><option value="en">English</option></select></div>
+        <div class="field"><label>Pronouns</label><input x-model="cfg.persona.pronouns" placeholder="they/them" /></div>
+        <div class="field"><label>Age range</label><input x-model="cfg.persona.age_range" placeholder="early 20s" /></div>
+        <div class="field"><label>Origin</label><input x-model="cfg.persona.origin" placeholder="somewhere online" /></div>
+        <div class="field wide"><label>Archetype</label><input x-model="cfg.persona.archetype" placeholder="variety streamer" /></div>
+        <div class="field wide"><label>Backstory</label><textarea rows="4" x-model="cfg.persona.backstory"></textarea></div>
       </div>
-    </section>
+    </div>
 
     <!-- ============ PERSONALITY ============ -->
-    <section x-show="section==='personality'" class="section">
-      <header class="section-head">
-        <h2>Personality</h2>
-        <p>How they talk, not what they talk about.</p>
-      </header>
-
-      <div class="field">
-        <label>Energy</label>
-        <div class="segmented wide-seg">
-          <template x-for="v in ['chill','warm','hyped','unhinged']" :key="v">
-            <button :class="{on: cfg.persona.energy===v}" @click="cfg.persona.energy=v" x-text="v"></button>
-          </template>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Humor style <small class="hint">(pick any)</small></label>
-        <div class="chips">
-          <template x-for="h in humorOptions" :key="h">
-            <button class="chip toggle"
-              :class="{on: cfg.persona.humor_style.includes(h)}"
-              @click="toggleInList(cfg.persona.humor_style, h)"
-              x-text="h.replace('_',' ')"></button>
-          </template>
-        </div>
-      </div>
-
+    <div class="section" x-show="section==='personality'">
+      <header class="section-head"><h2>Personality</h2><p>How they talk, not what they talk about.</p></header>
+      <div class="field"><label>Energy</label><div class="segmented"><template x-for="v in ['chill','warm','hyped','unhinged']" :key="v"><button :class="{on: cfg.persona.energy===v}" @click="cfg.persona.energy=v" x-text="v"></button></template></div></div>
+      <div class="field"><label>Humor style <small class="hint">(pick any)</small></label><div class="chips"><template x-for="h in humorOptions" :key="h"><button class="chip toggle" :class="{on: cfg.persona.humor_style.includes(h)}" @click="toggleInList(cfg.persona.humor_style, h)" x-text="h.replace('_',' ')"></button></template></div></div>
       <div class="grid three">
-        <div class="field">
-          <label>Profanity</label>
-          <div class="segmented">
-            <button :class="{on: cfg.persona.profanity==='none'}" @click="cfg.persona.profanity='none'">none</button>
-            <button :class="{on: cfg.persona.profanity==='mild'}" @click="cfg.persona.profanity='mild'">mild</button>
-            <button :class="{on: cfg.persona.profanity==='heavy'}" @click="cfg.persona.profanity='heavy'">heavy</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Formality</label>
-          <div class="segmented">
-            <button :class="{on: cfg.persona.formality==='street'}" @click="cfg.persona.formality='street'">street</button>
-            <button :class="{on: cfg.persona.formality==='casual'}" @click="cfg.persona.formality='casual'">casual</button>
-            <button :class="{on: cfg.persona.formality==='formal'}" @click="cfg.persona.formality='formal'">formal</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Sentence length</label>
-          <div class="segmented">
-            <button :class="{on: cfg.persona.sentence_length==='short'}" @click="cfg.persona.sentence_length='short'">short</button>
-            <button :class="{on: cfg.persona.sentence_length==='medium'}" @click="cfg.persona.sentence_length='medium'">medium</button>
-            <button :class="{on: cfg.persona.sentence_length==='mixed'}" @click="cfg.persona.sentence_length='mixed'">mixed</button>
-          </div>
-        </div>
+        <div class="field"><label>Profanity</label><div class="segmented"><button :class="{on: cfg.persona.profanity==='none'}" @click="cfg.persona.profanity='none'">none</button><button :class="{on: cfg.persona.profanity==='mild'}" @click="cfg.persona.profanity='mild'">mild</button><button :class="{on: cfg.persona.profanity==='heavy'}" @click="cfg.persona.profanity='heavy'">heavy</button></div></div>
+        <div class="field"><label>Formality</label><div class="segmented"><button :class="{on: cfg.persona.formality==='street'}" @click="cfg.persona.formality='street'">street</button><button :class="{on: cfg.persona.formality==='casual'}" @click="cfg.persona.formality='casual'">casual</button><button :class="{on: cfg.persona.formality==='formal'}" @click="cfg.persona.formality='formal'">formal</button></div></div>
+        <div class="field"><label>Sentence length</label><div class="segmented"><button :class="{on: cfg.persona.sentence_length==='short'}" @click="cfg.persona.sentence_length='short'">short</button><button :class="{on: cfg.persona.sentence_length==='medium'}" @click="cfg.persona.sentence_length='medium'">medium</button><button :class="{on: cfg.persona.sentence_length==='mixed'}" @click="cfg.persona.sentence_length='mixed'">mixed</button></div></div>
       </div>
-
-      <div class="grid three toggles">
-        <label class="toggle-row">
-          <span>Strong opinions</span>
-          <input type="checkbox" class="switch" x-model="cfg.persona.strong_opinions" />
-        </label>
-        <label class="toggle-row">
-          <span>Admit uncertainty</span>
-          <input type="checkbox" class="switch" x-model="cfg.persona.admit_uncertainty" />
-        </label>
-        <label class="toggle-row">
-          <span>Break 4th wall</span>
-          <input type="checkbox" class="switch" x-model="cfg.persona.break_fourth_wall" />
-        </label>
-      </div>
-
-      <div class="field">
-        <label>Catchphrases</label>
-        <div class="chip-input" x-data="chipInput(() => cfg.persona.catchphrases)">
-          <template x-for="(it, i) in model()" :key="i">
-            <span class="chip"><span x-text="it"></span><button @click="remove(i)">×</button></span>
-          </template>
-          <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
-        </div>
-      </div>
-      <div class="field">
-        <label>Running gags</label>
-        <div class="chip-input" x-data="chipInput(() => cfg.persona.running_gags)">
-          <template x-for="(it, i) in model()" :key="i">
-            <span class="chip"><span x-text="it"></span><button @click="remove(i)">×</button></span>
-          </template>
-          <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
-        </div>
-      </div>
-      <div class="field">
-        <label>Never say</label>
-        <div class="chip-input" x-data="chipInput(() => cfg.persona.banned_words)">
-          <template x-for="(it, i) in model()" :key="i">
-            <span class="chip danger"><span x-text="it"></span><button @click="remove(i)">×</button></span>
-          </template>
-          <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
-        </div>
-      </div>
-      <div class="grid two">
-        <div class="field">
-          <label>Favorite topics</label>
-          <div class="chip-input" x-data="chipInput(() => cfg.persona.favorite_topics)">
-            <template x-for="(it, i) in model()" :key="i">
-              <span class="chip ok"><span x-text="it"></span><button @click="remove(i)">×</button></span>
-            </template>
-            <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
-          </div>
-        </div>
-        <div class="field">
-          <label>Taboo topics</label>
-          <div class="chip-input" x-data="chipInput(() => cfg.persona.taboo_topics)">
-            <template x-for="(it, i) in model()" :key="i">
-              <span class="chip warn"><span x-text="it"></span><button @click="remove(i)">×</button></span>
-            </template>
-            <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <label>Extra style notes</label>
-        <textarea rows="3" x-model="cfg.persona.extra_style_notes" placeholder="Anything you couldn't express above."></textarea>
-      </div>
-
       <div class="test-strip">
         <button class="btn primary" @click="testPersona('monologue')" :disabled="testing">Test monologue</button>
         <button class="btn" @click="testPersona('chat')" :disabled="testing">Test chat reply</button>
-        <button class="btn" @click="testPersona('vision')" :disabled="testing" :title="cfg.llm.vision_capable ? '' : 'Enable a vision-capable model first'">Test vision line</button>
-        <div class="test-out" x-show="testResult">
-          <div class="test-label">Sample output</div>
-          <div class="test-text" x-text="testResult"></div>
-          <div class="test-actions" x-show="testResult">
-            <button class="btn tiny" @click="speakTest()">▶ speak this</button>
-          </div>
-        </div>
+        <button class="btn" @click="testPersona('vision')" :disabled="testing">Test vision line</button>
+        <div class="test-out" x-show="testResult"><div class="test-label">Sample output</div><div class="test-text" x-text="testResult"></div></div>
       </div>
-    </section>
+    </div>
 
     <!-- ============ VOICE ============ -->
-    <section x-show="section==='voice'" class="section">
-      <header class="section-head">
-        <h2>Voice</h2>
-        <p>Synthesis provider, voice ID, and delivery knobs.</p>
-      </header>
+    <div class="section" x-show="section==='voice'">
+      <header class="section-head"><h2>Voice</h2><p>Synthesis provider and voice ID.</p></header>
+      <div class="field"><label>Provider</label><div class="segmented"><button :class="{on: cfg.tts.provider==='fish'}" @click="cfg.tts.provider='fish'">Fish</button><button :class="{on: cfg.tts.provider==='elevenlabs'}" @click="cfg.tts.provider='elevenlabs'">ElevenLabs</button><button :class="{on: cfg.tts.provider==='piper'}" @click="cfg.tts.provider='piper'">Piper</button></div></div>
+      <div class="field"><label>Voice ID</label><input x-model="cfg.tts.voice_id" placeholder="voice id" /></div>
+    </div>
+
+    <!-- ============ TOPICS ============ -->
+    <div class="section" x-show="section==='topics'">
+      <header class="section-head"><h2>Topics</h2><p>What your streamer riffs on between chat messages.</p></header>
+      <div class="field"><label>Topic mode</label><div class="segmented"><button :class="{on: cfg.topics.mode==='ai_picks'}" @click="cfg.topics.mode='ai_picks'">AI picks each segment</button><button :class="{on: cfg.topics.mode==='list'}" @click="cfg.topics.mode='list'">From list</button></div></div>
+      <div class="field"><label>Topic pool</label><div class="chip-input" x-data="chipInput(() => cfg.topics.topics)"><template x-for="(it, i) in model()" :key="i"><span class="chip"><span x-text="it"></span><button @click="remove(i)">×</button></span></template><input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="type a topic and press Enter" /></div></div>
       <div class="grid two">
-        <div class="field">
-          <label>Provider</label>
-          <div class="segmented">
-            <button :class="{on: cfg.tts.provider==='fish'}" @click="cfg.tts.provider='fish'">Fish Audio</button>
-            <button :class="{on: cfg.tts.provider==='elevenlabs'}" @click="cfg.tts.provider='elevenlabs'">ElevenLabs</button>
-            <button :class="{on: cfg.tts.provider==='piper'}" @click="cfg.tts.provider='piper'">Piper (local · free)</button>
-            <button :class="{on: cfg.tts.provider==='kokoro'}" @click="cfg.tts.provider='kokoro'">Kokoro (local · free)</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Voice ID / Reference ID</label>
-          <input x-model="cfg.tts.voice_id" placeholder="voice id from your TTS dashboard" />
-        </div>
-        <div class="field">
-          <label>Sample rate</label>
-          <div class="segmented">
-            <template x-for="sr in [16000,22050,24000,44100]" :key="sr">
-              <button :class="{on: cfg.tts.sample_rate===sr}" @click="cfg.tts.sample_rate=sr" x-text="sr"></button>
-            </template>
-          </div>
-        </div>
-        <div class="field" x-show="cfg.tts.provider==='fish'">
-          <label>Fish latency mode</label>
-          <div class="segmented">
-            <button :class="{on: cfg.tts.fish_latency_mode==='balanced'}" @click="cfg.tts.fish_latency_mode='balanced'">balanced (fast)</button>
-            <button :class="{on: cfg.tts.fish_latency_mode==='normal'}" @click="cfg.tts.fish_latency_mode='normal'">normal (quality)</button>
-          </div>
-        </div>
-        <template x-if="cfg.tts.provider==='elevenlabs'">
-          <div class="field wide">
-            <label>ElevenLabs model</label>
-            <input x-model="cfg.tts.el_model_id" placeholder="eleven_turbo_v2_5" />
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='elevenlabs'">
-          <div class="field">
-            <label>Stability <span class="slider-val" x-text="cfg.tts.el_stability.toFixed(2)"></span></label>
-            <input type="range" min="0" max="1" step="0.01" x-model.number="cfg.tts.el_stability" />
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='elevenlabs'">
-          <div class="field">
-            <label>Similarity <span class="slider-val" x-text="cfg.tts.el_similarity_boost.toFixed(2)"></span></label>
-            <input type="range" min="0" max="1" step="0.01" x-model.number="cfg.tts.el_similarity_boost" />
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='elevenlabs'">
-          <div class="field">
-            <label>Style <span class="slider-val" x-text="cfg.tts.el_style.toFixed(2)"></span></label>
-            <input type="range" min="0" max="1" step="0.01" x-model.number="cfg.tts.el_style" />
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='piper'">
-          <div class="field wide">
-            <label>Piper voice model path</label>
-            <input x-model="cfg.tts.piper_model_path" placeholder="voices/en_US-amy-medium.onnx" />
-            <small class="hint">
-              Download with: <code>python scripts/download_piper_voice.py en_US-amy-medium</code>.
-              Browse voices at <a href="https://huggingface.co/rhasspy/piper-voices" target="_blank">huggingface.co/rhasspy/piper-voices</a>.
-            </small>
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='piper'">
-          <div class="field">
-            <label>Speed (length scale) <span class="slider-val" x-text="cfg.tts.piper_length_scale.toFixed(2)"></span></label>
-            <input type="range" min="0.6" max="1.6" step="0.05" x-model.number="cfg.tts.piper_length_scale" />
-            <small class="hint">1.0 = normal · &lt;1 faster · &gt;1 slower</small>
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='kokoro'">
-          <div class="field wide">
-            <label>Kokoro voice</label>
-            <input x-model="cfg.tts.kokoro_voice" placeholder="af_heart" />
-            <small class="hint">
-              e.g. <code>af_heart</code>, <code>af_bella</code>, <code>am_adam</code>, <code>bf_emma</code> (a=US, b=UK · f=female, m=male).
-              Needs: <code>pip install kokoro soundfile</code> (uses PyTorch). No API key.
-            </small>
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='kokoro'">
-          <div class="field">
-            <label>Language</label>
-            <div class="segmented">
-              <button :class="{on: cfg.tts.kokoro_lang_code==='a'}" @click="cfg.tts.kokoro_lang_code='a'">US English</button>
-              <button :class="{on: cfg.tts.kokoro_lang_code==='b'}" @click="cfg.tts.kokoro_lang_code='b'">UK English</button>
-            </div>
-          </div>
-        </template>
-        <template x-if="cfg.tts.provider==='kokoro'">
-          <div class="field">
-            <label>Speed <span class="slider-val" x-text="cfg.tts.kokoro_speed.toFixed(2)"></span></label>
-            <input type="range" min="0.5" max="2.0" step="0.05" x-model.number="cfg.tts.kokoro_speed" />
-          </div>
-        </template>
+        <div class="field"><label>Min seconds on a topic <span class="slider-val" x-text="cfg.topics.switch_min_sec.toFixed(0)+'s'"></span></label><input type="range" min="30" max="600" step="10" x-model.number="cfg.topics.switch_min_sec" /></div>
+        <div class="field"><label>Switch chance per segment <span class="slider-val" x-text="Math.round(cfg.topics.switch_chance*100)+'%'"></span></label><input type="range" min="0" max="0.8" step="0.01" x-model.number="cfg.topics.switch_chance" /></div>
       </div>
-
-      <div class="test-strip">
-        <input class="test-input" x-model="voiceTestText" placeholder="Type a line to test the voice..." />
-        <button class="btn primary" @click="testVoice()" :disabled="!voiceTestText || testing">▶ Play</button>
-      </div>
-    </section>
-
-    <!-- ============ AVATAR ============ -->
-    <section x-show="section==='avatar'" class="section">
-      <header class="section-head">
-        <h2>Avatar</h2>
-        <p>VTube Studio integration. Lipsync, idle motion and expression triggers driven by the speech pipeline.</p>
-      </header>
-
-      <label class="toggle-row big">
-        <span>Enable VTube Studio avatar</span>
-        <input type="checkbox" class="switch" x-model="cfg.avatar.enabled" />
-      </label>
-
-      <div class="vts-status" :class="avatarStatus.connected ? 'on' : 'off'">
-        <span class="dot"></span>
-        <div class="vts-status-text">
-          <strong x-text="avatarStatus.connected ? 'CONNECTED' : (avatarStatus.enabled ? 'WAITING FOR VTS…' : 'DISABLED')"></strong>
-          <small x-text="avatarStatus.host || 'no host'"></small>
-        </div>
-        <div class="vts-status-meta" x-show="avatarStatus.connected">
-          <span x-text="avatarStatus.model || '?'"></span> ·
-          <span x-text="(avatarStatus.hotkey_count || 0) + ' hotkeys'"></span> ·
-          <span x-text="formatHMS(avatarStatus.uptime_sec) + ' up'"></span>
-        </div>
-      </div>
-
-      <div class="grid two" x-show="cfg.avatar.enabled">
-        <div class="field">
-          <label>VTS host</label>
-          <input x-model="cfg.avatar.vts_host" placeholder="127.0.0.1" />
-        </div>
-        <div class="field">
-          <label>VTS port</label>
-          <input type="number" x-model.number="cfg.avatar.vts_port" />
-        </div>
-      </div>
-
-      <h3 class="subhead">Lipsync</h3>
-      <div class="grid three">
-        <div class="field">
-          <label>Gain <span class="slider-val" x-text="cfg.avatar.lipsync_gain.toFixed(2)"></span></label>
-          <input type="range" min="1" max="10" step="0.1" x-model.number="cfg.avatar.lipsync_gain" />
-          <small class="hint">Boost the raw RMS. Higher = mouth moves more.</small>
-        </div>
-        <div class="field">
-          <label>Ceiling <span class="slider-val" x-text="cfg.avatar.lipsync_ceiling.toFixed(2)"></span></label>
-          <input type="range" min="0.4" max="1" step="0.01" x-model.number="cfg.avatar.lipsync_ceiling" />
-          <small class="hint">Max MouthOpen value.</small>
-        </div>
-        <div class="field">
-          <label>Floor <span class="slider-val" x-text="cfg.avatar.lipsync_floor.toFixed(3)"></span></label>
-          <input type="range" min="0" max="0.1" step="0.005" x-model.number="cfg.avatar.lipsync_floor" />
-          <small class="hint">Below this RMS, mouth stays closed.</small>
-        </div>
-        <div class="field">
-          <label>Attack <span class="slider-val" x-text="cfg.avatar.lipsync_attack.toFixed(2)"></span></label>
-          <input type="range" min="0.05" max="1" step="0.01" x-model.number="cfg.avatar.lipsync_attack" />
-          <small class="hint">How fast the mouth opens (1 = instant).</small>
-        </div>
-        <div class="field">
-          <label>Release <span class="slider-val" x-text="cfg.avatar.lipsync_release.toFixed(2)"></span></label>
-          <input type="range" min="0.05" max="1" step="0.01" x-model.number="cfg.avatar.lipsync_release" />
-          <small class="hint">How fast the mouth closes (lower = smoother).</small>
-        </div>
-        <div class="field">
-          <label>Speaking smile <span class="slider-val" x-text="cfg.avatar.speaking_smile.toFixed(2)"></span></label>
-          <input type="range" min="0" max="0.6" step="0.01" x-model.number="cfg.avatar.speaking_smile" />
-          <small class="hint">Default smile while speaking. 0 = flat mouth.</small>
-        </div>
-      </div>
-
-      <h3 class="subhead">Viseme lip sync</h3>
-      <div class="grid three toggles">
-        <label class="toggle-row">
-          <span>Spectral mouth shape</span>
-          <input type="checkbox" class="switch" x-model="cfg.avatar.enable_viseme_lipsync" />
-        </label>
-        <div class="field">
-          <label>Smoothing <span class="slider-val" x-text="cfg.avatar.viseme_smoothing.toFixed(2)"></span></label>
-          <input type="range" min="0.05" max="0.8" step="0.05" x-model.number="cfg.avatar.viseme_smoothing" />
-          <small class="hint">How fast mouth shape follows audio. Higher = snappier.</small>
-        </div>
-        <div></div>
-      </div>
-
-      <h3 class="subhead">Idle motion</h3>
-      <div class="grid three toggles">
-        <label class="toggle-row">
-          <span>Head sway when silent</span>
-          <input type="checkbox" class="switch" x-model="cfg.avatar.enable_idle_motion" />
-        </label>
-        <label class="toggle-row">
-          <span>Eye darts</span>
-          <input type="checkbox" class="switch" x-model="cfg.avatar.enable_eye_darts" />
-        </label>
-        <div></div>
-        <div class="field">
-          <label>Sway amplitude (deg) <span class="slider-val" x-text="cfg.avatar.idle_sway_amplitude.toFixed(1)"></span></label>
-          <input type="range" min="0" max="12" step="0.5" x-model.number="cfg.avatar.idle_sway_amplitude" />
-        </div>
-        <div class="field">
-          <label>Sway period (sec) <span class="slider-val" x-text="cfg.avatar.idle_sway_period_sec.toFixed(1)"></span></label>
-          <input type="range" min="2" max="20" step="0.5" x-model.number="cfg.avatar.idle_sway_period_sec" />
-        </div>
-        <div class="field">
-          <label>Eye dart interval (sec) <span class="slider-val" x-text="cfg.avatar.eye_dart_interval_sec.toFixed(1)"></span></label>
-          <input type="range" min="1" max="15" step="0.5" x-model.number="cfg.avatar.eye_dart_interval_sec" />
-        </div>
-      </div>
-
-      <h3 class="subhead">Parameter mapping <small class="hint">(must match the model's parameter IDs)</small></h3>
-      <div class="grid three">
-        <div class="field"><label>MouthOpen</label><input x-model="cfg.avatar.param_mouth_open" /></div>
-        <div class="field"><label>MouthSmile</label><input x-model="cfg.avatar.param_mouth_smile" /></div>
-        <div class="field"><label>FaceAngleX</label><input x-model="cfg.avatar.param_face_x" /></div>
-        <div class="field"><label>FaceAngleY</label><input x-model="cfg.avatar.param_face_y" /></div>
-        <div class="field"><label>FaceAngleZ</label><input x-model="cfg.avatar.param_face_z" /></div>
-        <div class="field"><label>EyeX</label><input x-model="cfg.avatar.param_eye_x" /></div>
-        <div class="field"><label>EyeY</label><input x-model="cfg.avatar.param_eye_y" /></div>
-        <div class="field"><label>Brows</label><input x-model="cfg.avatar.param_brows" /></div>
-      </div>
-
-      <h3 class="subhead">Expressions <small class="hint">(map each emotion slot to a VTS hotkey)</small></h3>
-
-      <div class="hotkey-toolbar">
-        <button class="btn" @click="fetchHotkeys()" :disabled="!avatarStatus.connected">
-          🔄 Discover hotkeys from VTS
-        </button>
-        <span class="muted" x-show="avatarStatus.connected" x-text="'(' + avatarHotkeys.length + ' available)'"></span>
-        <span class="muted" x-show="avatarTestMsg" x-text="avatarTestMsg"></span>
-      </div>
-
-      <div class="emotion-grid">
-        <template x-for="slot in emotionSlots" :key="slot">
-          <div class="emotion-row">
-            <label x-text="slot"></label>
-            <select :value="cfg.avatar['expr_' + slot]" @change="cfg.avatar['expr_' + slot] = $event.target.value">
-              <option value="">(none)</option>
-              <template x-for="hk in avatarHotkeys" :key="hk.hotkeyID">
-                <option :value="hk.hotkeyID" x-text="(hk.name || hk.hotkeyID) + (hk.type ? ' · ' + hk.type : '')"></option>
-              </template>
-            </select>
-            <input type="text" x-model="cfg.avatar['expr_' + slot]" placeholder="or type id…" class="emotion-fallback" />
-            <button class="btn tiny" @click="testEmotion(slot)" :disabled="!avatarStatus.connected">▶</button>
-          </div>
-        </template>
-      </div>
-
-      <h3 class="subhead">Test look direction</h3>
-      <div class="look-grid">
-        <button class="btn" @click="testLook(-15, -10)" :disabled="!avatarStatus.connected">↖</button>
-        <button class="btn" @click="testLook(0, -10)" :disabled="!avatarStatus.connected">↑</button>
-        <button class="btn" @click="testLook(15, -10)" :disabled="!avatarStatus.connected">↗</button>
-        <button class="btn" @click="testLook(-15, 0)" :disabled="!avatarStatus.connected">←</button>
-        <button class="btn" @click="testLook(0, 0)" :disabled="!avatarStatus.connected">·</button>
-        <button class="btn" @click="testLook(15, 0)" :disabled="!avatarStatus.connected">→</button>
-        <button class="btn" @click="testLook(-15, 10)" :disabled="!avatarStatus.connected">↙</button>
-        <button class="btn" @click="testLook(0, 10)" :disabled="!avatarStatus.connected">↓</button>
-        <button class="btn" @click="testLook(15, 10)" :disabled="!avatarStatus.connected">↘</button>
-      </div>
-    </section>
-
-    <!-- ============ STREAM / TOPICS ============ -->
-    <section x-show="section==='topics'" class="section">
-      <header class="section-head">
-        <h2>Topics</h2>
-        <p>What your streamer riffs on between chat messages.</p>
-      </header>
-      <div class="field">
-        <label>Topic mode</label>
-        <div class="segmented">
-          <button :class="{on: cfg.topics.mode==='ai_picks'}" @click="cfg.topics.mode='ai_picks'">AI picks each segment</button>
-          <button :class="{on: cfg.topics.mode==='list'}" @click="cfg.topics.mode='list'">From list</button>
-        </div>
-      </div>
-      <div class="field">
-        <label>Topic pool</label>
-        <div class="chip-input" x-data="chipInput(() => cfg.topics.topics)">
-          <template x-for="(it, i) in model()" :key="i">
-            <span class="chip"><span x-text="it"></span><button @click="remove(i)">×</button></span>
-          </template>
-          <input type="text" x-model="draft" @keydown.enter.prevent="add()" @blur="add()" placeholder="add + Enter" />
-        </div>
-      </div>
-      <div class="grid two">
-        <div class="field">
-          <label>Min seconds on a topic <span class="slider-val" x-text="cfg.topics.switch_min_sec.toFixed(0)+'s'"></span></label>
-          <input type="range" min="30" max="600" step="10" x-model.number="cfg.topics.switch_min_sec" />
-        </div>
-        <div class="field">
-          <label>Switch chance per segment <span class="slider-val" x-text="Math.round(cfg.topics.switch_chance*100)+'%'"></span></label>
-          <input type="range" min="0" max="0.8" step="0.01" x-model.number="cfg.topics.switch_chance" />
-        </div>
-      </div>
-    </section>
+    </div>
 
     <!-- ============ VISION ============ -->
-    <section x-show="section==='vision'" class="section">
-      <header class="section-head">
-        <h2>Vision</h2>
-        <p>Let your streamer react to what's on your screen. Needs a vision-capable LLM.</p>
-      </header>
-      <label class="toggle-row big">
-        <span>Enable screen vision</span>
-        <input type="checkbox" class="switch" x-model="cfg.vision.enabled" />
-      </label>
-      <div x-show="cfg.vision.enabled && !cfg.llm.vision_capable" class="warn-banner">
-        Your LLM is marked as not vision-capable. Enable <b>vision_capable</b> under <b>Engine</b> and pick a model that supports images (e.g. gpt-4o, claude-sonnet-4-5, gemini-2.5-pro, llama-4-scout).
-      </div>
-      <div class="grid two" x-show="cfg.vision.enabled">
-        <div class="field">
-          <label>Monitor index</label>
-          <input type="number" x-model.number="cfg.vision.monitor_index" />
-          <small class="hint">mss index. 1 = primary. 0 = all monitors combined.</small>
-        </div>
-        <div class="field">
-          <label>Frame interval <span class="slider-val" x-text="cfg.vision.interval_sec.toFixed(1)+'s'"></span></label>
-          <input type="range" min="1" max="10" step="0.5" x-model.number="cfg.vision.interval_sec" />
-        </div>
-        <div class="field">
-          <label>Change threshold <span class="slider-val" x-text="cfg.vision.min_change_threshold"></span></label>
-          <input type="range" min="2" max="24" step="1" x-model.number="cfg.vision.min_change_threshold" />
-          <small class="hint">Higher = less sensitive. Frame is skipped if pHash diff is below this.</small>
-        </div>
-        <div class="field">
-          <label>Max edge (px) <span class="slider-val" x-text="cfg.vision.max_edge_px"></span></label>
-          <input type="range" min="384" max="1280" step="32" x-model.number="cfg.vision.max_edge_px" />
-          <small class="hint">Downscale before sending to the model. Smaller = faster + cheaper.</small>
-        </div>
-        <div class="field">
-          <label>Startup delay <span class="slider-val" x-text="cfg.vision.startup_delay_sec.toFixed(0)+'s'"></span></label>
-          <input type="range" min="0" max="15" step="1" x-model.number="cfg.vision.startup_delay_sec" />
-          <small class="hint">Wait before capturing. Gives you time to switch to your content after hitting Start.</small>
-        </div>
-      </div>
-      <div x-show="cfg.vision.enabled">
-        <label class="toggle-row">
-          <span>First-person framing <small class="hint">("my game", "the tab I opened")</small></span>
-          <input type="checkbox" class="switch" x-model="cfg.persona.vision_first_person" />
-        </label>
-        <div class="field">
-          <label>Commentary density</label>
-          <div class="segmented">
-            <button :class="{on: cfg.persona.vision_commentary_density==='sparse'}" @click="cfg.persona.vision_commentary_density='sparse'">sparse</button>
-            <button :class="{on: cfg.persona.vision_commentary_density==='balanced'}" @click="cfg.persona.vision_commentary_density='balanced'">balanced</button>
-            <button :class="{on: cfg.persona.vision_commentary_density==='dense'}" @click="cfg.persona.vision_commentary_density='dense'">dense</button>
-          </div>
-        </div>
-      </div>
+    <div class="section" x-show="section==='vision'">
+      <header class="section-head"><h2>Vision</h2><p>Let your streamer react to what's on your screen.</p></header>
+      <label class="toggle-row big"><span>Enable screen vision</span><input type="checkbox" class="switch" x-model="cfg.vision.enabled" /></label>
+    </div>
 
-      <div class="test-strip" x-show="cfg.vision.enabled">
-        <button class="btn primary" @click="testVision()" :disabled="testing">📸 Capture screen + ask LLM</button>
-        <small class="hint" x-show="!visionTestResult">Grabs one frame from your screen and sends it to the configured vision model. Use this to verify the pipeline before starting a full session.</small>
-        <div class="test-out" x-show="visionTestResult">
-          <div class="test-label">Model said</div>
-          <div class="test-text" x-text="visionTestResult"></div>
-          <div class="test-actions" x-show="visionTestMeta">
-            <small class="hint mono" x-text="visionTestMeta"></small>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ PLAY (MINECRAFT) ============ -->
-    <section x-show="section==='play'" class="section">
-      <header class="section-head">
-        <h2>Play — Minecraft 🎮</h2>
-        <p>Wallie actually PLAYS Minecraft and reacts in character. When this is ON, the commentary is grounded in what Wallie is really doing (not guessing from the screen). When OFF, standard Vision mode runs as usual.</p>
-      </header>
-
-      <label class="toggle-row big">
-        <span>Enable Play mode</span>
-        <input type="checkbox" class="switch" x-model="cfg.play.enabled" />
-      </label>
-
-      <div x-show="cfg.play.enabled">
-        <div class="field">
-          <label>What should Wallie do? (goal)</label>
-          <textarea rows="3" x-model="cfg.play.goal" placeholder="Build a base, gear up, explore…"></textarea>
-          <small class="hint">The playing brain pursues this. Keep it open-ended for an entertaining show.</small>
-        </div>
-
-        <label class="toggle-row">
-          <span>Commentary from the playing brain <small class="hint">(grounded, no screen hallucination)</small></span>
-          <input type="checkbox" class="switch" x-model="cfg.play.talk_from_agent" />
-        </label>
-        <label class="toggle-row">
-          <span>Hide in-game chat & bot commands <small class="hint">(clean stream)</small></span>
-          <input type="checkbox" class="switch" x-model="cfg.play.hide_chat" />
-        </label>
-        <label class="toggle-row">
-          <span>Keep out of water (open-ground play)</span>
-          <input type="checkbox" class="switch" x-model="cfg.play.avoid_water" />
-        </label>
-
-        <div class="setup-card" style="margin-top:16px;">
-          <h3>One-click setup</h3>
-          <p class="hint">Installs Fabric + the mods Wallie needs (Fabric API, Meteor, Baritone, smooth-cam) into your <code>.minecraft</code>. Backs up your current mods first. Needs Java 21+.</p>
-          <div class="btn-row">
-            <button class="btn" :disabled="playBusy" @click="installMinecraft()">⬇ Install Minecraft mods</button>
-            <button class="btn primary" :disabled="playBusy || !cfg.play.enabled" @click="launchPlay()">▶ Launch Wallie Play</button>
-          </div>
-          <pre x-show="playLog" x-text="playLog" class="play-log" style="white-space:pre-wrap;max-height:220px;overflow:auto;margin-top:12px;padding:10px;background:#0d0d12;border-radius:8px;font-size:12px;"></pre>
-          <small class="hint">After install: open the Minecraft launcher, pick the <b>fabric-loader-1.21.11</b> profile, join a survival world, then hit <b>Launch Wallie Play</b> and focus the game. <b>F8</b> stops it.</small>
-        </div>
-      </div>
-    </section>
+    <!-- ============ PLAY (MC) ============ -->
+    <div class="section" x-show="section==='play'">
+      <header class="section-head"><h2>Play — Minecraft 🎮</h2><p>Wallie actually PLAYS Minecraft and reacts in character.</p></header>
+      <label class="toggle-row big"><span>Enable Play mode</span><input type="checkbox" class="switch" x-model="cfg.play.enabled" /></label>
+    </div>
 
     <!-- ============ HEARING ============ -->
-    <section x-show="section==='hearing'" class="section">
-      <header class="section-head">
-        <h2>Hearing</h2>
-        <p>Let your streamer hear system audio — game sound, video, music, voice — and fuse it with what it sees. Runs locally (no API cost).</p>
-      </header>
-      <label class="toggle-row big">
-        <span>Enable hearing</span>
-        <input type="checkbox" class="switch" x-model="cfg.hearing.enabled" />
-      </label>
-      <div class="grid two" x-show="cfg.hearing.enabled">
-        <div class="field">
-          <label>Whisper model</label>
-          <select x-model="cfg.hearing.model_size">
-            <option value="tiny">tiny (fastest)</option>
-            <option value="base">base</option>
-            <option value="small">small</option>
-            <option value="medium">medium (recommended w/ GPU)</option>
-            <option value="large-v3">large-v3 (best lyrics, GPU)</option>
-          </select>
-          <small class="hint">Local speech-to-text. Bigger = more accurate, esp. for song lyrics. Runs on GPU automatically if you have CUDA (so medium stays fast); else CPU. For lyrics, medium + setting the language below helps a lot.</small>
-        </div>
-        <div class="field">
-          <label>Language</label>
-          <input type="text" x-model="cfg.hearing.language" placeholder="auto" />
-          <small class="hint">Blank = auto-detect. Or force: en, tr, es, ...</small>
-        </div>
-        <div class="field">
-          <label>Listen window <span class="slider-val" x-text="cfg.hearing.window_sec.toFixed(1)+'s'"></span></label>
-          <input type="range" min="3" max="10" step="0.5" x-model.number="cfg.hearing.window_sec" />
-          <small class="hint">How much audio to capture per pass. Shorter = snappier, longer = more context.</small>
-        </div>
-        <div class="field">
-          <label>Context freshness <span class="slider-val" x-text="cfg.hearing.max_context_age_sec.toFixed(0)+'s'"></span></label>
-          <input type="range" min="4" max="30" step="1" x-model.number="cfg.hearing.max_context_age_sec" />
-          <small class="hint">How long a heard line stays relevant for fusing with vision.</small>
-        </div>
-      </div>
-      <div x-show="cfg.hearing.enabled" class="hint" style="margin-top:8px">
-        Needs <b>soundcard</b> + <b>faster-whisper</b> installed. Captures the default speaker via WASAPI loopback.
-      </div>
-    </section>
+    <div class="section" x-show="section==='hearing'">
+      <header class="section-head"><h2>Hearing</h2><p>Let your streamer hear system audio.</p></header>
+      <label class="toggle-row big"><span>Enable hearing</span><input type="checkbox" class="switch" x-model="cfg.hearing.enabled" /></label>
+    </div>
 
     <!-- ============ CHAT ============ -->
-    <section x-show="section==='chat'" class="section">
-      <header class="section-head">
-        <h2>Chat</h2>
-        <p>Live chat monitoring across platforms.</p>
-      </header>
+    <div class="section" x-show="section==='chat'">
+      <header class="section-head"><h2>Chat</h2><p>Live chat monitoring across platforms.</p></header>
       <div class="grid three">
-        <label class="toggle-row">
-          <span>YouTube</span>
-          <input type="checkbox" class="switch" x-model="cfg.chat.youtube_enabled" />
-        </label>
-        <label class="toggle-row">
-          <span>Twitch</span>
-          <input type="checkbox" class="switch" x-model="cfg.chat.twitch_enabled" />
-        </label>
-        <label class="toggle-row">
-          <span>Kick</span>
-          <input type="checkbox" class="switch" x-model="cfg.chat.kick_enabled" />
-        </label>
+        <label class="toggle-row"><span>YouTube</span><input type="checkbox" class="switch" x-model="cfg.chat.youtube_enabled" /></label>
+        <label class="toggle-row"><span>Twitch</span><input type="checkbox" class="switch" x-model="cfg.chat.twitch_enabled" /></label>
+        <label class="toggle-row"><span>Kick</span><input type="checkbox" class="switch" x-model="cfg.chat.kick_enabled" /></label>
       </div>
       <div class="grid two">
-        <div class="field">
-          <label>Reply chance <span class="slider-val" x-text="Math.round(cfg.chat.reply_probability*100)+'%'"></span></label>
-          <input type="range" min="0" max="1" step="0.05" x-model.number="cfg.chat.reply_probability" />
-          <small class="hint">Probability of replying to any given non-highlight message.</small>
-        </div>
-        <div class="field">
-          <label>Min interval between replies <span class="slider-val" x-text="cfg.chat.min_reply_interval_sec.toFixed(0)+'s'"></span></label>
-          <input type="range" min="1" max="30" step="1" x-model.number="cfg.chat.min_reply_interval_sec" />
-        </div>
-        <div class="field">
-          <label>Max message age <span class="slider-val" x-text="cfg.chat.max_message_age_sec.toFixed(0)+'s'"></span></label>
-          <input type="range" min="10" max="120" step="5" x-model.number="cfg.chat.max_message_age_sec" />
-          <small class="hint">Messages older than this are discarded.</small>
-        </div>
-        <div class="field">
-          <label>Address style</label>
-          <div class="segmented">
-            <button :class="{on: cfg.persona.address_style==='by_name'}" @click="cfg.persona.address_style='by_name'">by name</button>
-            <button :class="{on: cfg.persona.address_style==='generic'}" @click="cfg.persona.address_style='generic'">generic</button>
-            <button :class="{on: cfg.persona.address_style==='crowd'}" @click="cfg.persona.address_style='crowd'">crowd</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Reply length</label>
-          <div class="segmented">
-            <button :class="{on: cfg.persona.reply_length==='snappy'}" @click="cfg.persona.reply_length='snappy'">snappy</button>
-            <button :class="{on: cfg.persona.reply_length==='medium'}" @click="cfg.persona.reply_length='medium'">medium</button>
-            <button :class="{on: cfg.persona.reply_length==='longer'}" @click="cfg.persona.reply_length='longer'">longer</button>
-          </div>
-        </div>
-        <label class="toggle-row">
-          <span>Hype super chats / bits</span>
-          <input type="checkbox" class="switch" x-model="cfg.persona.react_to_highlights_hype" />
-        </label>
+        <div class="field"><label>Reply chance <span class="slider-val" x-text="Math.round(cfg.chat.reply_probability*100)+'%'"></span></label><input type="range" min="0" max="1" step="0.05" x-model.number="cfg.chat.reply_probability" /></div>
+        <div class="field"><label>Min interval between replies <span class="slider-val" x-text="cfg.chat.min_reply_interval_sec.toFixed(0)+'s'"></span></label><input type="range" min="1" max="30" step="1" x-model.number="cfg.chat.min_reply_interval_sec" /></div>
+        <div class="field"><label>Reply length</label><div class="segmented"><button :class="{on: cfg.persona.reply_length==='snappy'}" @click="cfg.persona.reply_length='snappy'">snappy</button><button :class="{on: cfg.persona.reply_length==='medium'}" @click="cfg.persona.reply_length='medium'">medium</button><button :class="{on: cfg.persona.reply_length==='longer'}" @click="cfg.persona.reply_length='longer'">longer</button></div></div>
       </div>
-      <p class="hint-block">
-        Channel credentials (Twitch OAuth, YouTube client_secret, Kick slug) live in <code>.env</code>. Edit that file then restart to pick them up.
-      </p>
-    </section>
+    </div>
 
     <!-- ============ AVATAR ============ -->
-    <section x-show="section==='avatar'" class="section">
-      <header class="section-head">
-        <h2>Avatar</h2>
-        <p>VTube Studio integration — drive your Live2D avatar's mouth and expressions in real time.</p>
-      </header>
+    <div class="section" x-show="section==='avatar'">
+      <header class="section-head"><h2>Avatar</h2><p>VTube Studio integration.</p></header>
+      <label class="toggle-row big"><span>Enable VTube Studio avatar</span><input type="checkbox" class="switch" x-model="cfg.avatar.enabled" /></label>
+    </div>
 
-      <label class="toggle-row big">
-        <span>Enable VTube Studio avatar</span>
-        <input type="checkbox" class="switch" x-model="cfg.avatar.enabled" />
-      </label>
+    <!-- ============ ENGINE ============ -->
+    <div class="section" x-show="section==='engine'">
+      <header class="section-head"><h2>Engine</h2><p>The brain.</p></header>
+      <div class="field"><label>Provider</label><div class="segmented"><button :class="{on: cfg.llm.provider==='groq'}" @click="cfg.llm.provider='groq'">Groq</button><button :class="{on: cfg.llm.provider==='openai'}" @click="cfg.llm.provider='openai'">OpenAI</button><button :class="{on: cfg.llm.provider==='gemini'}" @click="cfg.llm.provider='gemini'">Gemini</button></div></div>
+      <div class="field"><label>Model</label><input x-model="cfg.llm.model" placeholder="llama-3.1-8b-instant" /></div>
+    </div>
 
-      <div x-show="cfg.avatar.enabled">
-        <h3 class="subhead">Connection</h3>
-        <div class="grid two">
-          <div class="field">
-            <label>VTS host</label>
-            <input x-model="cfg.avatar.vts_host" placeholder="127.0.0.1" />
-            <small class="hint">IP address of the machine running VTube Studio.</small>
-          </div>
-          <div class="field">
-            <label>VTS port</label>
-            <input type="number" x-model.number="cfg.avatar.vts_port" placeholder="8001" />
-            <small class="hint">Default API port is 8001.</small>
-          </div>
-        </div>
-
-        <h3 class="subhead">Parameters</h3>
-        <div class="grid two">
-          <div class="field">
-            <label>Mouth open parameter</label>
-            <input x-model="cfg.avatar.param_mouth_open" placeholder="MouthOpen" />
-            <small class="hint">VTS parameter ID used for lip sync.</small>
-          </div>
-          <div class="field">
-            <label>Mouth smile parameter</label>
-            <input x-model="cfg.avatar.param_mouth_smile" placeholder="MouthSmile" />
-            <small class="hint">Optional parameter for smile blending.</small>
-          </div>
-          <div class="field">
-            <label>Mouth form parameter</label>
-            <input x-model="cfg.avatar.param_mouth_form" placeholder="ParamMouthForm" />
-            <small class="hint">Viseme shape (wide ↔ round). Leave default if unsure.</small>
-          </div>
-        </div>
-
-        <h3 class="subhead">Expression Hotkeys</h3>
-        <p class="hint-block">Enter the exact hotkey name (case-sensitive) as configured in VTube Studio. Leave blank to skip that emotion.</p>
-        <div class="grid three">
-          <div class="field">
-            <label>😊 Happy</label>
-            <input x-model="cfg.avatar.expr_happy" placeholder="e.g. happy" />
-          </div>
-          <div class="field">
-            <label>😲 Surprised</label>
-            <input x-model="cfg.avatar.expr_surprised" placeholder="e.g. surprised" />
-          </div>
-          <div class="field">
-            <label>😂 Laughing</label>
-            <input x-model="cfg.avatar.expr_laughing" placeholder="e.g. laughing" />
-          </div>
-        </div>
-
-        <div class="test-strip avatar-test-strip">
-          <input class="test-input" x-model="avatarTestExpr" placeholder="Hotkey name to test..." />
-          <button class="btn primary" @click="testExpression()" :disabled="!avatarTestExpr || testing">▶ Trigger</button>
-          <span class="hint muted" x-show="avatarTestMsg" x-text="avatarTestMsg"></span>
-        </div>
-        <p class="hint-block">
-          On first connect Wallie will request a plugin token — click <b>Allow</b> in the VTube Studio popup. The token is saved to <code>.wallie_vts_token</code> for future sessions.
-        </p>
-      </div>
-    </section>
-
-    <!-- ============ ENGINE (LLM) ============ -->
-    <section x-show="section==='engine'" class="section">
-      <header class="section-head">
-        <h2>Engine</h2>
-        <p>The brain. Pick a provider and tune sampling.</p>
-      </header>
-      <div class="grid two">
-        <div class="field">
-          <label>Provider</label>
-          <div class="segmented wide-seg">
-            <template x-for="p in ['groq','openai','openrouter','anthropic','gemini','ollama']" :key="p">
-              <button :class="{on: cfg.llm.provider===p}" @click="cfg.llm.provider=p; onProviderChange()" x-text="p"></button>
-            </template>
-          </div>
-        </div>
-        <template x-if="cfg.llm.provider !== 'ollama'">
-          <div class="field">
-            <label>Model</label>
-            <select x-model="cfg.llm.model" @change="onModelSelect()">
-              <option value="" disabled>-- select model --</option>
-              <template x-for="m in modelOptions()" :key="m.id">
-                <option :value="m.id" x-text="m.label + (m.vision ? ' \u00b7 vision' : '') + (m.custom ? ' (custom)' : '')"></option>
-              </template>
-            </select>
-          </div>
-        </template>
-        <template x-if="cfg.llm.provider === 'ollama'">
-          <div class="field">
-            <label>Model</label>
-            <input x-model="cfg.llm.model" placeholder="e.g. llama3.2" />
-            <small class="hint">Enter the model name as shown in <code>ollama list</code></small>
-          </div>
-        </template>
-        <div class="field">
-          <label>Temperature <span class="slider-val" x-text="cfg.llm.temperature.toFixed(2)"></span></label>
-          <input type="range" min="0" max="1.5" step="0.05" x-model.number="cfg.llm.temperature" />
-        </div>
-        <div class="field">
-          <label>Top-p <span class="slider-val" x-text="cfg.llm.top_p.toFixed(2)"></span></label>
-          <input type="range" min="0" max="1" step="0.01" x-model.number="cfg.llm.top_p" />
-        </div>
-        <div class="field">
-          <label>Max tokens <span class="slider-val" x-text="cfg.llm.max_tokens"></span></label>
-          <input type="range" min="80" max="1500" step="10" x-model.number="cfg.llm.max_tokens" />
-        </div>
-        <div class="field">
-          <label>Presence penalty <span class="slider-val" x-text="cfg.llm.presence_penalty.toFixed(2)"></span></label>
-          <input type="range" min="-2" max="2" step="0.05" x-model.number="cfg.llm.presence_penalty" />
-        </div>
-        <div class="field">
-          <label>Frequency penalty <span class="slider-val" x-text="cfg.llm.frequency_penalty.toFixed(2)"></span></label>
-          <input type="range" min="-2" max="2" step="0.05" x-model.number="cfg.llm.frequency_penalty" />
-        </div>
-        <label class="toggle-row">
-          <span>Model supports vision</span>
-          <input type="checkbox" class="switch" x-model="cfg.llm.vision_capable" />
-        </label>
-        <template x-if="cfg.llm.provider === 'ollama'">
-          <div class="field" style="grid-column: 1 / -1;">
-            <label>Ollama base URL</label>
-            <input x-model="cfg.llm.ollama_base_url" placeholder="http://localhost:11434" />
-            <small class="hint">URL where <code>ollama serve</code> is running. Leave default for local installs.</small>
-          </div>
-        </template>
-        <template x-if="cfg.llm.provider === 'ollama'">
-          <div class="field">
-            <label>Keep-alive</label>
-            <input x-model="cfg.llm.ollama_keep_alive" placeholder="5m" />
-            <small class="hint">How long to keep the model loaded in VRAM after last use (e.g. <code>5m</code>, <code>1h</code>, <code>-1</code> = forever).</small>
-          </div>
-        </template>
-      </div>
-
-      <h3 class="subhead">Session</h3>
-      <div class="grid three">
-        <div class="field">
-          <label>Duration (minutes) <span class="slider-val" x-text="cfg.orchestrator.session_duration_min > 0 ? cfg.orchestrator.session_duration_min.toFixed(0) : '∞'"></span></label>
-          <input type="range" min="0" max="240" step="5" x-model.number="cfg.orchestrator.session_duration_min" />
-          <small class="hint">0 = unlimited. Otherwise, the streamer signs off naturally near the end.</small>
-        </div>
-        <div class="field">
-          <label>Outro window <span class="slider-val" x-text="cfg.orchestrator.outro_seconds.toFixed(0)+'s'"></span></label>
-          <input type="range" min="10" max="120" step="5" x-model.number="cfg.orchestrator.outro_seconds" />
-          <small class="hint">When time-remaining drops below this, the next segment becomes the wrap-up.</small>
-        </div>
-        <div class="field">
-          <label>Segment target <span class="slider-val" x-text="cfg.orchestrator.segment_target_sec.toFixed(0)+'s'"></span></label>
-          <input type="range" min="6" max="40" step="1" x-model.number="cfg.orchestrator.segment_target_sec" />
-        </div>
-      </div>
-
-      <h3 class="subhead">Memory & Dedupe</h3>
-      <div class="grid three">
-        <div class="field">
-          <label>Recent verbatim turns <span class="slider-val" x-text="cfg.orchestrator.recent_verbatim_turns"></span></label>
-          <input type="range" min="8" max="60" step="2" x-model.number="cfg.orchestrator.recent_verbatim_turns" />
-          <small class="hint">Older turns get folded into a rolling summary.</small>
-        </div>
-        <div class="field">
-          <label>Summarize every <span class="slider-val" x-text="cfg.orchestrator.summarize_every_n+' segments'"></span></label>
-          <input type="range" min="6" max="40" step="1" x-model.number="cfg.orchestrator.summarize_every_n" />
-        </div>
-        <div class="field">
-          <label>Dedupe window <span class="slider-val" x-text="cfg.orchestrator.dedupe_window"></span></label>
-          <input type="range" min="2" max="15" step="1" x-model.number="cfg.orchestrator.dedupe_window" />
-        </div>
-        <div class="field">
-          <label>Dedupe threshold <span class="slider-val" x-text="cfg.orchestrator.dedupe_threshold.toFixed(2)"></span></label>
-          <input type="range" min="0.5" max="0.95" step="0.01" x-model.number="cfg.orchestrator.dedupe_threshold" />
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ SECRETS / API KEYS ============ -->
-    <section x-show="section==='secrets'" class="section">
-      <header class="section-head">
-        <h2>API Keys</h2>
-        <p>
-          Stored locally in <code>.env</code>, never committed to your profile.
-          The dashboard only ever shows a masked preview — the raw value never
-          leaves this machine.
-        </p>
-      </header>
-
-      <div class="warn-banner" style="border-color: rgba(96,165,250,.4); background: rgba(96,165,250,.06); color: #c8dafc;">
-        <b>Heads up:</b> the dashboard runs on <code>127.0.0.1</code> by default
-        and is unauthenticated. If you change <code>DASHBOARD_HOST</code> to bind
-        to your LAN, anyone on that network can read masked previews and
-        overwrite your keys. Use a reverse proxy with auth in that case.
-      </div>
-
-      <template x-for="kind in ['llm','tts','stream']" :key="kind">
-        <div>
-          <h3 class="subhead" x-text="kind === 'llm' ? 'LLM providers' : kind === 'tts' ? 'TTS providers' : 'Stream platforms'"></h3>
-          <div class="secrets-list">
-            <template x-for="s in secretsByKind(kind)" :key="s.env">
-              <div class="secret-row">
-                <div class="secret-label">
-                  <strong x-text="s.label"></strong>
-                  <a x-show="s.url" :href="s.url" target="_blank" class="muted secret-url">get key ↗</a>
-                  <small class="hint" x-text="s.hint"></small>
-                </div>
-
-                <div class="secret-value">
-                  <!-- viewing mode: masked preview + edit button -->
-                  <template x-if="!(s.env in secretEdits)">
-                    <div class="secret-display">
-                      <span class="secret-mask" x-show="s.is_set" x-text="s.masked"></span>
-                      <span class="secret-empty" x-show="!s.is_set">not set</span>
-                      <button class="btn tiny" @click="startEditSecret(s.env)">
-                        <span x-text="s.is_set ? 'edit' : 'add'"></span>
-                      </button>
-                      <button class="btn tiny" x-show="s.is_set && (kind==='llm' || kind==='tts')"
-                        @click="testProviderKey(envToProvider(s.env), s.env)"
-                        :disabled="secretBusy[s.env]">
-                        <span x-show="!secretBusy[s.env]">test</span>
-                        <span x-show="secretBusy[s.env]">…</span>
-                      </button>
-                    </div>
-                  </template>
-
-                  <!-- edit mode: input + save / cancel -->
-                  <template x-if="s.env in secretEdits">
-                    <div class="secret-edit">
-                      <input
-                        :type="secretShow[s.env] ? 'text' : 'password'"
-                        x-model="secretEdits[s.env]"
-                        :placeholder="s.is_set ? 'enter new value to replace, or leave blank to clear' : 'paste key…'"
-                        autocomplete="off"
-                        spellcheck="false"
-                      />
-                      <button class="btn tiny ghost" @click="secretShow[s.env] = !secretShow[s.env]"
-                        :title="secretShow[s.env] ? 'hide' : 'show'">
-                        <span x-text="secretShow[s.env] ? '🙈' : '👁'"></span>
-                      </button>
-                      <button class="btn tiny primary" @click="saveSecret(s.env)">save</button>
-                      <button class="btn tiny" @click="cancelEditSecret(s.env)">cancel</button>
-                    </div>
-                  </template>
-
-                  <span class="secret-msg" x-show="secretMsg[s.env]" x-text="secretMsg[s.env]"></span>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </template>
-    </section>
-
+    <!-- ============ API KEYS ============ -->
+    <div class="section" x-show="section==='secrets'">
+      <header class="section-head"><h2>API Keys</h2><p>Stored locally in .env</p></header>
+      <p class="hint-block">Keys are managed in the .env file. Click Save after changing.</p>
+    </div>
   </main>
 
   <!-- ============ LIVE DRAWER ============ -->
   <aside class="drawer">
-    <header class="drawer-head">
-      <h3>Live</h3>
-      <span class="mono muted" x-text="status.llm || '—'"></span>
-    </header>
+    <header class="drawer-head"><h3>Live</h3><span class="mono muted" x-text="status.llm || '—'"></span></header>
     <div class="stat-grid">
-      <div class="stat"><label>Profile</label><div class="one-line" x-text="status.profile || activeProfile"></div></div>
-      <div class="stat"><label>Topic</label><div class="one-line" x-text="status.current_topic || (cfg.topics.mode==='ai_picks' ? 'AI picks' : '—')"></div></div>
+      <div class="stat"><label>Profile</label><div x-text="status.profile || activeProfile"></div></div>
+      <div class="stat"><label>Topic</label><div x-text="status.current_topic || '—'"></div></div>
       <div class="stat"><label>Elapsed</label><div x-text="formatHMS(status.elapsed_sec)"></div></div>
-      <div class="stat"><label>Remaining</label><div x-text="status.remaining_sec === null || status.remaining_sec === undefined ? '∞' : formatHMS(status.remaining_sec)"></div></div>
       <div class="stat"><label>Segments</label><div x-text="status.segments_spoken || 0"></div></div>
-      <div class="stat"><label>Memory</label><div x-text="(status.session_notes_chars || 0) + ' chars'"></div></div>
-      <div class="stat"><label>Audio queue</label><div x-text="(status.audio_queue_sec || 0).toFixed(1) + 's'"></div></div>
-      <div class="stat"><label>TTS</label><div class="one-line" x-text="status.tts || '—'"></div></div>
     </div>
-
-    <div class="panel-sub" x-show="status.vision_countdown > 0">
-      <div class="panel-title" style="color: var(--warn)">Vision starting in <span x-text="Math.ceil(status.vision_countdown)"></span>s — switch to your content</div>
-    </div>
-
-    <div class="panel-sub" x-show="status.user_behavior">
-      <div class="panel-title">Screen activity</div>
-      <div class="behavior-row" :class="{ active: status.user_behavior && status.user_behavior !== 'starting' }">
-        <span class="behavior-dot"></span>
-        <span x-text="status.user_behavior || 'idle'"></span>
-        <span class="behavior-value" x-text="status.user_settled ? 'settled' : 'pace ' + (status.browsing_pace || 0)"></span>
-      </div>
-    </div>
-
-    <div class="panel-sub">
-      <div class="panel-title">Now saying</div>
-      <div class="now-saying" x-text="status.last_spoken || 'silent.'"></div>
-    </div>
-
-    <div class="panel-sub" x-show="(status.open_threads || []).length > 0">
-      <div class="panel-title">Open threads <span class="muted">(must pay off)</span></div>
-      <ul class="thread-list">
-        <template x-for="t in (status.open_threads || [])" :key="t">
-          <li x-text="t"></li>
-        </template>
-      </ul>
-    </div>
-
-    <div class="panel-sub" x-show="(status.recent_themes || []).length > 0">
-      <div class="panel-title">Recent angles <span class="muted">(don't repeat)</span></div>
-      <ul class="theme-list">
-        <template x-for="t in (status.recent_themes || [])" :key="t">
-          <li x-text="t"></li>
-        </template>
-      </ul>
-    </div>
-
-    <div class="panel-sub" x-show="status.session_notes_preview">
-      <div class="panel-title">Memory <span class="muted" x-text="'(' + (status.verbatim_msgs || 0) + ' verbatim msgs · ' + (status.session_notes_chars || 0) + ' notes chars)'"></span></div>
-      <div class="now-saying" style="border-left-color: var(--info)" x-text="status.session_notes_preview"></div>
-    </div>
-
-    <div class="panel-sub">
-      <div class="panel-title">Live log</div>
-      <div class="log">
-        <template x-for="line in logs.slice(-200)" :key="line.id">
-          <div class="log-line" :class="line.level.toLowerCase()">
-            <span class="t" x-text="line.time.slice(11,19)"></span>
-            <span class="m" x-text="line.msg"></span>
-          </div>
-        </template>
-      </div>
-    </div>
+    <div class="panel-sub"><div class="panel-title">Now saying</div><div class="now-saying" x-text="status.last_spoken || 'silent.'"></div></div>
   </aside>
 </div>
 
-<!-- ============ FIRST-RUN SETUP WIZARD ============ -->
-<div class="wz-overlay" x-show="wizard.open" x-cloak @keydown.escape.window="closeWizard()">
-  <div class="wz-card" @click.outside="closeWizard()">
-    <div class="wz-head">
-      <div class="wz-steps">
-        <template x-for="n in 4" :key="n">
-          <div class="wz-dot" :class="{ on: wizard.step === n, done: wizard.step > n }" x-text="wizard.step > n ? '✓' : n"></div>
-        </template>
-      </div>
-      <button class="wz-x" @click="closeWizard()" title="Close">×</button>
+<!-- ============ BOTTOM CHAT INPUT BOX ============ -->
+<div style="padding: 20px; border-top: 2px solid #555; margin: 20px 0; background: #1a1a2e; border-radius: 8px; position: relative; clear: both;">
+    <h3 style="color: #fff; margin-bottom: 10px;">💬 Chat with Wallie</h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+        <input type="text" id="sayInput" placeholder="Type your message to Wallie..." style="flex:1; min-width:200px; padding:12px; font-size:16px; border:2px solid #555; border-radius:8px; background:#2a2a3e; color:#fff;">
+        <button onclick="sendMessage()" style="padding:12px 24px; font-size:16px; background:#6c5ce7; color:white; border:none; border-radius:8px; cursor:pointer;">Say</button>
     </div>
-
-    <div class="wz-body">
-      <!-- STEP 1: PERSONA -->
-      <div x-show="wizard.step === 1">
-        <div class="wz-title">Welcome to Wallie 👋</div>
-        <div class="wz-sub">Pick a personality to start from — you can fully customize it later, or build one from scratch.</div>
-        <div class="wz-grid">
-          <template x-for="p in profiles" :key="p">
-            <button class="wz-opt" :class="{ sel: activeProfile === p }" @click="wizardPickProfile(p)" :disabled="wizard.busy">
-              <h4 x-text="p"></h4>
-              <p>Load the "<span x-text="p"></span>" personality preset.</p>
-            </button>
-          </template>
-          <button class="wz-opt" @click="wizardStartFresh()">
-            <h4>✏️ Start fresh</h4>
-            <p>Keep the current profile and design your own character.</p>
-          </button>
-        </div>
-      </div>
-
-      <!-- STEP 2: BUDGET PATH -->
-      <div x-show="wizard.step === 2">
-        <div class="wz-title">Pick your setup</div>
-        <div class="wz-sub">Wallie runs on your own keys — your cost, no middleman. Choose a path; you can change any of it later.</div>
-        <div class="wz-grid" style="grid-template-columns:1fr">
-          <button class="wz-opt" :class="{ sel: wizard.path === 'free' }" @click="wizardChoosePath('free')" :disabled="wizard.busy">
-            <h4>🆓 Free <span class="wz-badge">$0 / hr</span></h4>
-            <p>Gemini (free key) for brains + Piper local voice. Great for testing.</p>
-            <div class="wz-price">Needs: 1 free key &middot; voice runs locally</div>
-          </button>
-          <button class="wz-opt" :class="{ sel: wizard.path === 'cheap' }" @click="wizardChoosePath('cheap')" :disabled="wizard.busy">
-            <h4>⚡ Fast &amp; cheap <span class="wz-badge">recommended</span></h4>
-            <p>Groq (free tier) for brains + Fish Audio voice. Best balance of speed and quality.</p>
-            <div class="wz-price">~$1.50 / hr &middot; 2 keys</div>
-          </button>
-          <button class="wz-opt" :class="{ sel: wizard.path === 'premium' }" @click="wizardChoosePath('premium')" :disabled="wizard.busy">
-            <h4>💎 Premium</h4>
-            <p>Claude Sonnet for brains + ElevenLabs voice. Best quality and vision.</p>
-            <div class="wz-price">~$6.50 / hr &middot; 2 keys</div>
-          </button>
-        </div>
-      </div>
-
-      <!-- STEP 3: KEYS -->
-      <div x-show="wizard.step === 3">
-        <div class="wz-title">Add your key<span x-show="(wizardKeys()||[]).length > 1">s</span></div>
-        <div class="wz-sub">Paste each key and we'll save &amp; test it instantly. Click "Get key" to grab one — it takes a minute.</div>
-        <template x-for="k in wizardKeys()" :key="k.env">
-          <div class="wz-keyrow">
-            <div class="wz-kh">
-              <label><span x-text="k.label"></span> <span class="wz-badge" x-show="k.free">free</span></label>
-              <a class="wz-getlink" :href="k.url" target="_blank" rel="noopener">Get key ↗</a>
-            </div>
-            <div class="wz-inrow" x-show="!wizardKeyIsSet(k.env) || (wizard.keyDrafts[k.env] ?? '') !== ''">
-              <input type="password" placeholder="Paste key here" x-model="wizard.keyDrafts[k.env]" @keydown.enter="wizardSaveKey(k.env)" />
-              <button class="wz-btn primary" @click="wizardSaveKey(k.env)" :disabled="wizard.keyBusy[k.env] || !(wizard.keyDrafts[k.env])">Save</button>
-            </div>
-            <div class="wz-msg ok" x-show="wizardKeyIsSet(k.env) && (wizard.keyDrafts[k.env] ?? '') === ''">✓ saved &amp; ready</div>
-            <div class="wz-msg" :class="(wizard.keyMsg[k.env]||'').startsWith('✓') ? 'ok' : 'bad'" x-show="wizard.keyMsg[k.env]" x-text="wizard.keyMsg[k.env]"></div>
-          </div>
-        </template>
-        <div class="wz-note" x-show="wizardPathIsFree()">
-          🔊 Free voice (Piper) runs locally and needs one extra step: in a terminal run
-          <code>pip install piper-tts onnxruntime</code> then
-          <code>python scripts/download_piper_voice.py en_US-amy-medium</code>.
-          Prefer zero setup? Pick a paid voice in the Voice tab instead — everything else is ready.
-        </div>
-      </div>
-
-      <!-- STEP 4: DONE -->
-      <div x-show="wizard.step === 4">
-        <div class="wz-done">
-          <div class="wz-check">🎉</div>
-          <div class="wz-title">You're all set</div>
-          <div class="wz-sub" style="margin-bottom:.5rem">Your streamer is configured. Hit start and Wallie comes alive — or fine-tune anything in the dashboard first.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="wz-foot">
-      <div>
-        <button class="wz-btn ghost" x-show="wizard.step > 1 && wizard.step < 4" @click="wizardBack()">← Back</button>
-      </div>
-      <div style="display:flex;gap:.7rem;align-items:center">
-        <button class="wz-skip" x-show="wizard.step < 4" @click="finishWizard()">Skip setup</button>
-        <button class="wz-btn primary" x-show="wizard.step === 3" :disabled="!wizardKeysReady()" @click="wizard.step = 4">Continue →</button>
-        <button class="wz-btn ghost" x-show="wizard.step === 4" @click="finishWizard()">I'll start later</button>
-        <button class="wz-btn primary" x-show="wizard.step === 4" :disabled="wizard.busy" @click="wizardFinishAndStart()">Start streaming ▶</button>
-      </div>
-    </div>
-  </div>
+    <!-- FIXED: Bottom chat box with proper scrollbar -->
+    <div id="chatResponse" style="padding:12px; background:#2a2a3e; border-radius:8px; color:#e0e0e0; font-size:14px; line-height: 1.6; height: 400px; overflow-y: auto; white-space: normal; word-wrap: break-word; border: 1px solid #444; min-height: 150px; overflow-x: hidden;"></div>
 </div>
+
+<script>
+function sendMessage() {
+  const input = document.getElementById('sayInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const responseDiv = document.getElementById('chatResponse');
+  if (!responseDiv) return;
+  
+  // Show "sending" status
+  responseDiv.style.display = 'block';
+  responseDiv.textContent = '⏳ Sending...';
+  
+  // Send the message to Wallie
+  fetch('/api/say', { 
+    method: 'POST', 
+    headers: {'Content-Type': 'application/json'}, 
+    body: JSON.stringify({text: text}) 
+  })
+  .then(r => r.json())
+  .then(data => {
+    input.value = '';
+    responseDiv.textContent = '💬 Message sent!';
+    
+    // === CRITICAL: Force Wallie to generate a response ===
+    // After 1 second, trigger a new monologue with your message as the topic
+    setTimeout(() => {
+      fetch('/api/test/persona', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          kind: 'monologue',
+          topic: text  // Use your message as the topic
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.text) {
+          // Update the NOW SAYING field with Wallie's response
+          const nowSaying = document.querySelector('.now-saying');
+          if (nowSaying) {
+            nowSaying.textContent = data.text;
+          }
+          // Also update the chat response
+          responseDiv.textContent = '🤖 Wallie: ' + data.text;
+        }
+      })
+      .catch(err => console.error('Error generating response:', err));
+    }, 1000);
+  })
+  .catch(err => {
+    responseDiv.textContent = '❌ Error: ' + err.message;
+    console.error('Error:', err);
+  });
+}
+
+function toggleChatBox() {
+  const chatBox = document.querySelector('div[style*="position: fixed; bottom: 20px; right: 20px;"]');
+  if (chatBox) { chatBox.style.display = chatBox.style.display === 'none' ? 'block' : 'none'; }
+}
+
+function chipInput(getList) {
+  return { draft: "", model() { return getList() || []; }, add() { const v = (this.draft || "").trim(); if (!v) return; const list = getList(); if (!list.includes(v)) list.push(v); this.draft = ""; }, remove(i) { getList().splice(i, 1); } };
+}
+
+function app() {
+  return {
+    sections: [
+      { id: "identity", label: "Identity", ico: "👤" },
+      { id: "personality", label: "Personality", ico: "🎭" },
+      { id: "voice", label: "Voice", ico: "🎤" },
+      { id: "topics", label: "Topics", ico: "📚" },
+      { id: "vision", label: "Vision", ico: "👁️" },
+      { id: "play", label: "Play (MC)", ico: "🎮" },
+      { id: "hearing", label: "Hearing", ico: "👂" },
+      { id: "chat", label: "Chat", ico: "💬" },
+      { id: "avatar", label: "Avatar", ico: "🧑" },
+      { id: "engine", label: "Engine", ico: "🧠" },
+      { id: "secrets", label: "API Keys", ico: "🔑" },
+    ],
+    section: "identity",
+    cfg: {},
+    profiles: [],
+    activeProfile: "default",
+    running: false,
+    status: {},
+    logs: [],
+    drawerOpen: true,
+    saveMsg: "",
+    testing: false,
+    testResult: "",
+    secrets: [],
+    wizard: { open: false },
+
+    chipInput,
+
+    async init() {
+      await this.loadProfiles();
+      await this.loadConfig();
+      await this.refreshStatus();
+      await this.loadSecrets();
+      setInterval(() => this.refreshStatus(), 3000);
+    },
+
+    async loadSecrets() {
+      try { const r = await fetch("/api/secrets"); const data = await r.json(); this.secrets = data.secrets || []; } catch (e) { console.warn("loadSecrets:", e); }
+    },
+
+    async loadProfiles() {
+      try { const r = await fetch("/api/profiles"); const data = await r.json(); this.profiles = data.profiles || []; this.activeProfile = data.active || "default"; } catch (e) { console.warn("loadProfiles:", e); }
+    },
+
+    async loadConfig() {
+      try { const r = await fetch("/api/config"); this.cfg = await r.json() || {}; } catch (e) { console.warn("loadConfig:", e); }
+    },
+
+    async save() {
+      try { const r = await fetch("/api/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.cfg) }); this.saveMsg = r.ok ? "saved" : "fail"; setTimeout(() => (this.saveMsg = ""), 1400); } catch (e) { console.warn("save:", e); }
+    },
+
+    async refreshStatus() {
+      try { const r = await fetch("/api/status"); this.status = await r.json(); this.running = !!this.status.running; } catch { this.running = false; }
+    },
+
+    async start() { await fetch("/api/start", { method: "POST" }); await this.refreshStatus(); },
+    async stop() { await fetch("/api/stop", { method: "POST" }); await this.refreshStatus(); },
+    async resetAudio() { try { await fetch("/api/audio/reset", { method: "POST" }); } catch (e) { console.warn(e); } },
+
+    async testPersona(kind) {
+      this.testResult = "…";
+      try { const r = await fetch("/api/test/persona", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind }) }); const data = await r.json(); this.testResult = data.text || "(no response)"; } catch (e) { this.testResult = "Error: " + e; }
+    },
+
+    toggleInList(list, value) { const i = list.indexOf(value); if (i >= 0) list.splice(i, 1); else list.push(value); },
+
+    formatHMS(seconds) {
+      if (!seconds) return "—";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      const pad = (n) => String(n).padStart(2, "0");
+      return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+    },
+  };
+}
+</script>
+
+<!-- ============ FLOATING CHAT BOX ============ -->
+<!-- FIXED: Floating chat container with proper height constraints -->
+<div style="position: fixed; bottom: 20px; right: 20px; width: 500px; max-height: 700px; display: flex; flex-direction: column; padding: 15px; background: #1a1a2e; border: 2px solid #6c5ce7; border-radius: 12px; z-index: 9999; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+    <h3 style="color: #fff; margin:0 0 10px 0; font-size:14px; cursor:pointer; flex-shrink: 0;" onclick="document.getElementById('chatContentFloating').style.display = document.getElementById('chatContentFloating').style.display === 'none' ? 'block' : 'none'">💬 Chat with Wallie <span style="font-size:10px;color:#888;">(click to toggle)</span></h3>
+    <!-- FIXED: Floating content container with max-height -->
+    <div id="chatContentFloating" style="display: flex; flex-direction: column; flex: 1; min-height: 0; max-height: 600px;">
+        <div style="display:flex; gap:8px; flex-shrink: 0; margin-bottom: 10px;">
+            <input type="text" id="sayInputFloating" placeholder="Type your message..." style="flex:1; padding:8px 12px; font-size:14px; border:1px solid #555; border-radius:6px; background:#2a2a3e; color:#fff;">
+            <button onclick="sendFloatingMessage()" style="padding:8px 16px; font-size:14px; background:#6c5ce7; color:white; border:none; border-radius:6px; cursor:pointer; flex-shrink: 0;">Say</button>
+        </div>
+        <!-- FIXED: Floating chat box with proper scrollbar -->
+        <div id="chatResponseFloating" style="padding:8px 12px; background:#2a2a3e; border-radius:6px; color:#e0e0e0; font-size:13px; line-height: 1.5; height: 350px; overflow-y: auto; min-height: 150px; white-space: normal; word-wrap: break-word; border: 1px solid #444; overflow-x: hidden; flex-shrink: 0;"></div>
+    </div>
+</div>
+
+<script>
+// Floating chat send function
+function sendFloatingMessage() {
+    const input = document.getElementById('sayInputFloating');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    const responseDiv = document.getElementById('chatResponseFloating');
+    if (!responseDiv) return;
+    responseDiv.style.display = 'block';
+    responseDiv.textContent = '⏳ Sending...';
+    
+    fetch('/api/say', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text})
+    })
+    .then(r => r.json())
+    .then(data => {
+        input.value = '';
+        responseDiv.textContent = '💬 Message sent!';
+        
+        // Force Wallie to respond
+        setTimeout(() => {
+            fetch('/api/test/persona', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    kind: 'monologue',
+                    topic: text
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.text) {
+                    const nowSaying = document.querySelector('.now-saying');
+                    if (nowSaying) {
+                        nowSaying.textContent = data.text;
+                    }
+                    responseDiv.textContent = '🤖 Wallie: ' + data.text;
+                }
+            })
+            .catch(err => console.error('Error generating response:', err));
+        }, 1000);
+    })
+    .catch(err => {
+        responseDiv.textContent = '❌ Error: ' + err.message;
+        console.error('Error:', err);
+    });
+}
+
+// Enter key support for floating chat
+document.addEventListener('keypress', function(e) {
+    if (e.target && e.target.id === 'sayInputFloating' && e.key === 'Enter') {
+        sendFloatingMessage();
+    }
+});
+
+// Also support the bottom chat box Enter key
+document.addEventListener('keypress', function(e) {
+    if (e.target && e.target.id === 'sayInput' && e.key === 'Enter') {
+        sendMessage();
+    }
+});
+</script>
 
 <script src="/static/app.js"></script>
 </body>
