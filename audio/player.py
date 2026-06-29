@@ -66,6 +66,7 @@ class AudioPlayer:
         self._stream: Optional[sd.RawOutputStream] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._last_write_ts: float = 0.0  # when audio was last queued (for hearing self-mute)
+        self._silent_mode: bool = False  # Flag for headless environments
 
     # ----- lifecycle -----
     def start(self) -> None:
@@ -75,29 +76,43 @@ class AudioPlayer:
             self._loop = asyncio.get_running_loop()
         except RuntimeError:
             self._loop = asyncio.get_event_loop()
-        # WASAPI shared mode demands the stream rate match the device's mix format
-        # (e.g. VB-CABLE is fixed at 48 kHz) and rejects our 24 kHz TTS otherwise.
-        # Enable auto-convert on WASAPI devices so PortAudio resamples for us.
-        extra = None
+        
+        # Try to initialize audio, but gracefully fall back to silent mode
         try:
-            if isinstance(self._device, int):
-                ha = sd.query_hostapis(sd.query_devices(self._device)["hostapi"])["name"]
-                if "wasapi" in ha.lower():
-                    extra = sd.WasapiSettings(auto_convert=True)
-        except Exception:  # noqa: BLE001 — fall back to no extra settings
+            # WASAPI shared mode demands the stream rate match the device's mix format
+            # (e.g. VB-CABLE is fixed at 48 kHz) and rejects our 24 kHz TTS otherwise.
+            # Enable auto-convert on WASAPI devices so PortAudio resamples for us.
             extra = None
-        self._stream = sd.RawOutputStream(
-            samplerate=self._sr,
-            channels=self._channels,
-            dtype="int16",
-            blocksize=self._blocksize,
-            device=self._device,
-            callback=self._callback,
-            extra_settings=extra,
-        )
-        self._stream.start()
-        logger.info(f"audio: playing at {self._sr} Hz, {self._channels}ch, block={self._blocksize}"
-                    f"{' (WASAPI auto-convert)' if extra else ''}")
+            try:
+                if isinstance(self._device, int):
+                    ha = sd.query_hostapis(sd.query_devices(self._device)["hostapi"])["name"]
+                    if "wasapi" in ha.lower():
+                        extra = sd.WasapiSettings(auto_convert=True)
+            except Exception:  # noqa: BLE001 — fall back to no extra settings
+                extra = None
+            
+            self._stream = sd.RawOutputStream(
+                samplerate=self._sr,
+                channels=self._channels,
+                dtype="int16",
+                blocksize=self._blocksize,
+                device=self._device,
+                callback=self._callback,
+                extra_settings=extra,
+            )
+            self._stream.start()
+            logger.info(f"audio: playing at {self._sr} Hz, {self._channels}ch, block={self._blocksize}"
+                        f"{' (WASAPI auto-convert)' if extra else ''}")
+        except (sd.PortAudioError, OSError, AttributeError, RuntimeError) as e:
+            logger.warning(f"⚠️ Audio not available (running in silent mode): {e}")
+            self._silent_mode = True
+            self._stream = None
+            # Set finished event so we don't hang waiting for audio
+            if self._loop is not None:
+                try:
+                    self._loop.call_soon_threadsafe(self._finished_event.set)
+                except RuntimeError:
+                    pass
 
     def close(self) -> None:
         if self._stream is not None:
@@ -110,7 +125,7 @@ class AudioPlayer:
 
     # ----- writing -----
     async def write(self, pcm: bytes) -> None:
-        if not pcm:
+        if not pcm or self._silent_mode:
             return
         if self._pending_odd is not None:
             pcm = bytes((self._pending_odd,)) + pcm
@@ -129,6 +144,8 @@ class AudioPlayer:
     def speaking_recently(self, window: float) -> bool:
         """True if Wallie is currently outputting audio or did within `window` seconds.
         Used by hearing to skip windows that contain Wallie's own voice (no self-echo)."""
+        if self._silent_mode:
+            return False
         return self.seconds_queued() > 0.02 or (time.time() - self._last_write_ts) < window
 
     def boundary(self) -> None:
@@ -159,14 +176,21 @@ class AudioPlayer:
             logger.info(f"audio: interrupt, dropped {dropped} bytes")
 
     async def wait_drained(self) -> None:
+        if self._silent_mode:
+            return
         await self._finished_event.wait()
 
     def seconds_queued(self) -> float:
+        if self._silent_mode:
+            return 0.0
         with self._lock:
             return len(self._buf) / (self._sr * self._channels * 2)
 
     # ----- audio callback -----
     def _callback(self, outdata, frames: int, time_info, status) -> None:  # noqa: ARG002
+        if self._silent_mode:
+            outdata.fill(0)
+            return
         if status:
             logger.debug(f"audio status: {status}")
         needed = frames * self._channels * 2
