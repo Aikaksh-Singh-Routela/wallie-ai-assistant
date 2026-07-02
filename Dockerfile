@@ -15,5 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
+# Accept build argument for API key
+ARG GROQ_API_KEY
+ENV GROQ_API_KEY=$GROQ_API_KEY
+
 # Run the application
 CMD ["python", "__main__.py", "--dashboard"]
